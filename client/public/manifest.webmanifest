@@ -1,0 +1,19 @@
+{
+  "name": "Eau Rapide",
+  "short_name": "Eau Rapide",
+  "description": "Trouvez un livreur d’eau disponible près de vous.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F1E9",
+  "theme_color": "#0F4C4A",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/eau-rapide-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
