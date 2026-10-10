@@ -109,6 +109,8 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 .trust-strip strong, .trust-strip span { display: block; }
 .trust-strip strong { color: var(--ink); font-size: 12px; }
 .trust-strip span { color: var(--muted); font-size: 10px; margin-top: 3px; }
+.pilot-note { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 10px; line-height: 1.4; text-align: center; padding: 14px 12px 2px; }
+.pilot-note svg { flex: 0 0 auto; color: var(--lagoon); }
 .page-section { padding-top: 4px; }
 .page-heading { margin-bottom: 20px; }
 .page-heading h1 { font-size: 31px; }

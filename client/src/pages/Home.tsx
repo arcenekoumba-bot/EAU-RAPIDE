@@ -181,14 +181,14 @@ function OrderModal({ livreur, onClose, onConfirm }: { livreur: Livreur; onClose
   );
 }
 
-function ClientHome({ livreurs, onOrder, onLocate }: { livreurs: Livreur[]; onOrder: (livreur: Livreur) => void; onLocate: () => void }) {
+function ClientHome({ livreurs, onOrder, onLocate, locationLabel }: { livreurs: Livreur[]; onOrder: (livreur: Livreur) => void; onLocate: () => void; locationLabel: string }) {
   return (
     <>
       <section className="welcome-row">
         <div><span className="eyebrow">Bonjour, bienvenue</span><h1>De l’eau, <em>sans détour.</em></h1></div>
         <button className="icon-button menu-button" aria-label="Ouvrir le menu"><Menu size={20} /></button>
       </section>
-      <button className="location-bar" onClick={onLocate}><span className="location-icon"><MapPin size={17} /></span><span><small>Livrer à</small><strong>Akanda, Libreville</strong></span><ChevronRight size={18} /></button>
+      <button className="location-bar" onClick={onLocate}><span className="location-icon"><MapPin size={17} /></span><span><small>Livrer à</small><strong>{locationLabel}</strong></span><ChevronRight size={18} /></button>
       <section className="hero-card">
         <div className="hero-copy"><span className="hero-kicker"><span className="pulse-dot" /> 6 livreurs actifs autour de vous</span><h2>Votre réserve ne devrait jamais être vide.</h2><p>Trouvez de l’eau potable et faites-vous livrer simplement, près de chez vous.</p><button className="light-button" onClick={onLocate}>Voir les livreurs <ArrowRight size={16} /></button></div>
         <div className="hero-art" aria-hidden="true"><Droplets size={92} strokeWidth={1.2} /><div className="hero-ripple ripple-one" /><div className="hero-ripple ripple-two" /></div>
@@ -196,6 +196,7 @@ function ClientHome({ livreurs, onOrder, onLocate }: { livreurs: Livreur[]; onOr
       <section className="quick-stats"><div><strong>15–25</strong><span>min moyen</span></div><div><strong>4.8/5</strong><span>note service</span></div><div><strong>7j/7</strong><span>disponible</span></div></section>
       <section className="section-block"><div className="section-heading"><div><span className="eyebrow">À proximité</span><h2>Livreurs disponibles</h2></div><button className="text-button" onClick={onLocate}><Search size={15} /> Rechercher</button></div><div className="list-stack">{livreurs.map(livreur => <LivreurCard key={livreur.id} livreur={livreur} onOrder={onOrder} />)}</div></section>
       <section className="trust-strip"><ShieldCheck size={21} /><div><strong>Des livreurs vérifiés</strong><span>Chaque profil est contrôlé avant d’être visible.</span></div><ChevronRight size={17} /></section>
+      <p className="pilot-note"><CheckCircle2 size={14} /> Mode pilote : les commandes restent enregistrées sur ce téléphone.</p>
     </>
   );
 }
@@ -218,6 +219,7 @@ function ProfileView({ userName, onLogin }: { userName?: string | null; onLogin:
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("accueil");
   const [mode, setMode] = useState<Mode>("client");
+  const [locationLabel, setLocationLabel] = useState("Akanda, Libreville");
   const [selectedLivreur, setSelectedLivreur] = useState<Livreur | null>(null);
   const [orders, setOrders] = useState<Order[]>(() => {
     try { return JSON.parse(localStorage.getItem("eau-rapide-orders") || "[]") as Order[]; } catch { return []; }
@@ -241,7 +243,10 @@ export default function Home() {
     }
     toast("Recherche de votre position…", { description: "Autorisez la localisation pour affiner les livreurs proches." });
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => toast.success("Position trouvée", { description: `Précision d’environ ${Math.round(coords.accuracy)} m. Nous affichons les livreurs proches.` }),
+      ({ coords }) => {
+        setLocationLabel("Position GPS détectée");
+        toast.success("Position trouvée", { description: `Précision d’environ ${Math.round(coords.accuracy)} m. Nous affichons les livreurs proches.` });
+      },
       () => toast.error("Position non disponible", { description: "Vous pouvez continuer en recherchant par quartier." }),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
@@ -256,5 +261,5 @@ export default function Home() {
   const advanceOrder = (id: string) => setOrders(current => current.map(order => order.id !== id ? order : { ...order, status: order.status === "Demandée" ? "Acceptée" : order.status === "Acceptée" ? "En route" : "Livrée" }));
   const cancelOrder = (id: string) => { setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
-  return <div className="app-shell"><Header userName={user?.name} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={user?.name} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => confirmOrder(selectedLivreur, quantity, address)} />}</div>;
+  return <div className="app-shell"><Header userName={user?.name} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={user?.name} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => confirmOrder(selectedLivreur, quantity, address)} />}</div>;
 }
