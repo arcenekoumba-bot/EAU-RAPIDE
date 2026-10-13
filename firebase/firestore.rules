@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow create, read, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    match /drivers/{driverId} {
+      // Les clients ne voient que les livreurs validés et disponibles.
+      allow read: if signedIn() && resource.data.approved == true;
+      allow create: if isOwner(driverId);
+      allow update: if isOwner(driverId);
+      allow delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow create: if signedIn()
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.status == 'Demandée';
+
+      allow read: if signedIn()
+        && (resource.data.customerId == request.auth.uid
+          || resource.data.driverId == request.auth.uid);
+
+      // Le client peut annuler sa commande demandée. Le livreur peut faire évoluer
+      // le statut d'une commande qui lui est attribuée. Les règles finales seront
+      // renforcées avec l'authentification des rôles dans l'incrément suivant.
+      allow update: if signedIn()
+        && ((resource.data.customerId == request.auth.uid
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.status == 'Annulée')
+        || (resource.data.driverId == request.auth.uid
+          && request.resource.data.driverId == resource.data.driverId));
+
+      allow delete: if false;
+    }
+  }
+}
