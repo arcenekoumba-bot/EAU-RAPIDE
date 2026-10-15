@@ -26,6 +26,15 @@ import {
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { startLogin } from "@/const";
+import {
+  createFirebaseOrder,
+  loginWithEmail,
+  observeCustomerOrders,
+  observeFirebaseUser,
+  registerWithEmail,
+  updateFirebaseOrderStatus,
+  type FirebaseOrder,
+} from "@/lib/firebase";
 
 type Tab = "accueil" | "commandes" | "profil";
 type Mode = "client" | "livreur";
@@ -216,11 +225,52 @@ function ProfileView({ userName, onLogin }: { userName?: string | null; onLogin:
   return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div><button className="icon-button"><Menu size={18} /></button></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
 }
 
+function AuthModal({ onClose }: { onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [register, setRegister] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!email || password.length < 6) {
+      toast.error("Renseignez un e-mail et un mot de passe d’au moins 6 caractères.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (register) await registerWithEmail(email, password);
+      else await loginWithEmail(email, password);
+      toast.success(register ? "Compte créé" : "Connexion réussie");
+      onClose();
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "Connexion impossible";
+      toast.error(code.includes("auth/invalid-credential") ? "E-mail ou mot de passe incorrect." : "Impossible de se connecter pour le moment.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="order-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+      <div className="modal-head"><div><span className="eyebrow">Eau Rapide</span><h2 id="auth-title">{register ? "Créer mon compte" : "Se connecter"}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={19} /></button></div>
+      <p className="modal-note">Votre compte permet de retrouver vos commandes sur plusieurs téléphones.</p>
+      <label className="field-label" htmlFor="auth-email">Adresse e-mail</label>
+      <input id="auth-email" className="text-input" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="vous@example.com" autoComplete="email" />
+      <label className="field-label" htmlFor="auth-password">Mot de passe</label>
+      <input id="auth-password" className="text-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="6 caractères minimum" autoComplete={register ? "new-password" : "current-password"} />
+      <button className="primary-button full" onClick={() => void submit()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte" : "Se connecter"}</button>
+      <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un compte gratuitement"}</button>
+    </section>
+  </div>;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("accueil");
   const [mode, setMode] = useState<Mode>("client");
   const [locationLabel, setLocationLabel] = useState("Akanda, Libreville");
   const [selectedLivreur, setSelectedLivreur] = useState<Livreur | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<{ uid: string; email?: string | null } | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>(() => {
     try { return JSON.parse(localStorage.getItem("eau-rapide-orders") || "[]") as Order[]; } catch { return []; }
   });
@@ -232,8 +282,25 @@ export default function Home() {
     localStorage.setItem("eau-rapide-orders", JSON.stringify(orders));
   }, [orders]);
 
+  useEffect(() => observeFirebaseUser(nextUser => setFirebaseUser(nextUser ? { uid: nextUser.uid, email: nextUser.email } : null)), []);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    return observeCustomerOrders(firebaseUser.uid, remoteOrders => {
+      setOrders(remoteOrders.map(order => ({
+        id: order.id || `ER-${Date.now()}`,
+        livreur: order.livreur as unknown as Livreur,
+        quantity: order.quantity,
+        address: order.address,
+        total: order.total,
+        status: order.status as OrderStatus,
+        createdAt: order.createdAt || new Date().toISOString(),
+      })));
+    });
+  }, [firebaseUser]);
+
   const login = () => {
-    try { startLogin(); } catch { toast.error("La connexion n’est pas encore configurée dans cet aperçu."); }
+    setAuthOpen(true);
   };
 
   const locate = () => {
@@ -251,15 +318,31 @@ export default function Home() {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   };
-  const confirmOrder = (livreur: Livreur, quantity: number, address: string) => {
+  const confirmOrder = async (livreur: Livreur, quantity: number, address: string) => {
     const order: Order = { id: `ER-${Date.now()}`, livreur, quantity, address, total: livreur.unitPrice * quantity + 1000, status: "Demandée", createdAt: new Date().toISOString() };
+    if (firebaseUser) {
+      try {
+        const id = await createFirebaseOrder({ customerId: firebaseUser.uid, driverId: livreur.id, livreur: livreur as unknown as Record<string, unknown>, quantity, address, total: order.total, status: order.status });
+        order.id = id;
+      } catch {
+        toast.error("La commande n’a pas pu être synchronisée.");
+        return;
+      }
+    }
     setOrders(current => [order, ...current]);
     setSelectedLivreur(null);
     setActiveTab("commandes");
     toast.success("Demande envoyée", { description: `${livreur.name} va confirmer votre livraison.` });
   };
-  const advanceOrder = (id: string) => setOrders(current => current.map(order => order.id !== id ? order : { ...order, status: order.status === "Demandée" ? "Acceptée" : order.status === "Acceptée" ? "En route" : "Livrée" }));
-  const cancelOrder = (id: string) => { setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
+  const advanceOrder = (id: string) => {
+    const current = orders.find(order => order.id === id);
+    if (!current) return;
+    const status = current.status === "Demandée" ? "Acceptée" : current.status === "Acceptée" ? "En route" : "Livrée";
+    if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, status).catch(() => toast.error("Mise à jour impossible"));
+    setOrders(list => list.map(order => order.id !== id ? order : { ...order, status }));
+  };
+  const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
-  return <div className="app-shell"><Header userName={user?.name} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={user?.name} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => confirmOrder(selectedLivreur, quantity, address)} />}</div>;
+  const displayName = firebaseUser?.email || user?.name;
+  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
 }
