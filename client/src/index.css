@@ -162,6 +162,14 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 .driver-onboarding div:nth-child(2) { flex: 1; }
 .driver-onboarding h2 { font-size: 14px; }
 .driver-onboarding p { color: var(--muted); font-size: 10px; line-height: 1.4; margin-top: 3px; }
+.driver-form-card { background: white; border: 1px solid var(--line); border-radius: 17px; box-shadow: 0 6px 18px rgba(23,63,57,.025); padding: 16px; margin-top: 13px; }
+.driver-form-card .section-heading { margin-bottom: 4px; }
+.driver-form-card .section-heading h2 { font-size: 17px; margin-top: 5px; }
+.text-input { display: block; width: 100%; color: var(--ink); background: #fbfcfa; border: 1px solid var(--line); border-radius: 10px; outline: 0; padding: 11px; font-size: 12px; }
+.text-input:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(112,208,192,.16); }
+.form-row { display: grid; grid-template-columns: 1.25fr .75fr; gap: 9px; }
+.driver-orders { margin-top: 22px; }
+.empty-state.compact { padding: 28px 18px; background: white; border: 1px solid var(--line); border-radius: 17px; }
 .fine-print { color: var(--muted); font-size: 10px; line-height: 1.5; text-align: center; padding: 17px 25px; }
 .profile-card { display: flex; align-items: center; gap: 11px; padding: 16px; margin-bottom: 14px; }
 .profile-avatar { display: grid; place-items: center; width: 48px; height: 48px; color: var(--lagoon); background: #d9eee9; border-radius: 16px; font-size: 19px; font-weight: 850; }

@@ -29,10 +29,15 @@ import { startLogin } from "@/const";
 import {
   createFirebaseOrder,
   loginWithEmail,
+  observeDriverOrders,
+  observeDriverProfile,
   observeCustomerOrders,
   observeFirebaseUser,
   registerWithEmail,
+  saveDriverProfile,
+  setDriverAvailability,
   updateFirebaseOrderStatus,
+  type FirebaseDriver,
   type FirebaseOrder,
 } from "@/lib/firebase";
 
@@ -216,9 +221,54 @@ function OrdersView({ orders, onAdvance, onCancel }: { orders: Order[]; onAdvanc
   );
 }
 
-function DriverView({ onLogin }: { onLogin: () => void }) {
-  const [available, setAvailable] = useState(false);
-  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Espace partenaire</span><h1>Je suis livreur</h1></div><button className="icon-button"><Menu size={18} /></button></div><div className="driver-hero"><div className="driver-hero-icon"><Truck size={27} /></div><div><span className="eyebrow">Gagnez du temps, livrez mieux</span><h2>Recevez les demandes autour de vous.</h2><p>Votre disponibilité, votre zone et vos tarifs restent sous votre contrôle.</p></div></div><article className="availability-card"><div><span className="eyebrow">Statut en direct</span><h2>{available ? "Vous êtes visible" : "Vous êtes hors ligne"}</h2><p>{available ? "Les clients proches peuvent vous trouver maintenant." : "Activez votre disponibilité pour apparaître dans la recherche."}</p></div><button className={available ? "availability-toggle on" : "availability-toggle"} onClick={() => setAvailable(value => !value)} aria-pressed={available}><span /></button></article><section className="driver-stats"><div><span>Demandes aujourd’hui</span><strong>3</strong><small>+2 hier</small></div><div><span>Livraisons du mois</span><strong>28</strong><small>Objectif 40</small></div><div><span>Votre note</span><strong>4.9</strong><small>sur 5</small></div></section><article className="driver-onboarding"><div className="onboarding-icon"><Plus size={20} /></div><div><h2>Créer mon profil livreur</h2><p>Ajoutez votre zone, vos contenants et vos tarifs pour commencer.</p></div><button className="round-action" onClick={onLogin}><ArrowRight size={17} /></button></article><p className="fine-print">La validation de votre profil est effectuée par Eau Rapide avant sa mise en ligne.</p></section>;
+function DriverView({ onLogin, userId }: { onLogin: () => void; userId?: string }) {
+  const [profile, setProfile] = useState<FirebaseDriver | null>(null);
+  const [orders, setOrders] = useState<FirebaseOrder[]>([]);
+  const [form, setForm] = useState({ name: "", zone: "", phone: "", product: "Bidon 20 L", unitPrice: "2500" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    const stopProfile = observeDriverProfile(userId, nextProfile => {
+      setProfile(nextProfile);
+      if (nextProfile) setForm({ name: nextProfile.name, zone: nextProfile.zone, phone: nextProfile.phone, product: nextProfile.product, unitPrice: String(nextProfile.unitPrice) });
+    });
+    const stopOrders = observeDriverOrders(userId, setOrders);
+    return () => { stopProfile(); stopOrders(); };
+  }, [userId]);
+
+  if (!userId) return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Espace partenaire</span><h1>Je suis livreur</h1></div></div><div className="driver-hero"><div className="driver-hero-icon"><Truck size={27} /></div><div><span className="eyebrow">Gagnez du temps, livrez mieux</span><h2>Recevez les demandes autour de vous.</h2><p>Connectez-vous pour créer votre profil et recevoir les commandes proches.</p></div></div><article className="driver-onboarding"><div className="onboarding-icon"><UserRound size={20} /></div><div><h2>Accéder à mon espace</h2><p>Votre profil et vos commandes seront protégés par votre compte.</p></div><button className="primary-small" onClick={onLogin}>Se connecter</button></article></section>;
+
+  const save = async () => {
+    const unitPrice = Number(form.unitPrice);
+    if (!form.name.trim() || !form.zone.trim() || !form.phone.trim() || !unitPrice || unitPrice < 1) {
+      toast.error("Complétez votre nom, votre zone, votre téléphone et votre tarif.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveDriverProfile(userId, { name: form.name.trim(), zone: form.zone.trim(), phone: form.phone.trim(), product: form.product.trim() || "Bidon 20 L", unitPrice, available: profile?.available ?? false });
+      toast.success("Profil livreur enregistré", { description: "Il sera visible après validation par Eau Rapide." });
+    } catch {
+      toast.error("Impossible d’enregistrer le profil pour le moment.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleAvailability = async () => {
+    if (!profile) {
+      toast.error("Enregistrez d’abord votre profil.");
+      return;
+    }
+    try {
+      await setDriverAvailability(userId, !profile.available);
+    } catch {
+      toast.error("Impossible de modifier votre disponibilité.");
+    }
+  };
+
+  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Espace partenaire</span><h1>Je suis livreur</h1></div><span className={profile?.approved ? "status-pill status-delivered" : "status-pill status-requested"}>{profile?.approved ? "Profil validé" : "À valider"}</span></div><div className="driver-hero"><div className="driver-hero-icon"><Truck size={27} /></div><div><span className="eyebrow">Votre activité</span><h2>Recevez les demandes autour de vous.</h2><p>Votre disponibilité reste sous votre contrôle. La position exacte du client n’est visible qu’avec une commande.</p></div></div><article className="availability-card"><div><span className="eyebrow">Statut en direct</span><h2>{profile?.available ? "Vous êtes visible" : "Vous êtes hors ligne"}</h2><p>{profile?.available ? "Les clients peuvent vous trouver dans votre zone." : "Enregistrez votre profil puis activez votre disponibilité."}</p></div><button className={profile?.available ? "availability-toggle on" : "availability-toggle"} onClick={() => void toggleAvailability()} aria-pressed={profile?.available ?? false}><span /></button></article><article className="driver-form-card"><div className="section-heading"><div><span className="eyebrow">Votre profil</span><h2>{profile ? "Modifier mes informations" : "Créer mon profil"}</h2></div><ShieldCheck size={19} className="verified-icon" /></div><label className="field-label" htmlFor="driver-name">Nom affiché</label><input id="driver-name" className="text-input" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="Ex. Grâce Services" /><label className="field-label" htmlFor="driver-zone">Zone de livraison</label><input id="driver-zone" className="text-input" value={form.zone} onChange={event => setForm(current => ({ ...current, zone: event.target.value }))} placeholder="Ex. Akanda · La Sablière" /><label className="field-label" htmlFor="driver-phone">Téléphone WhatsApp</label><input id="driver-phone" className="text-input" type="tel" value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))} placeholder="+241 ..." /><div className="form-row"><div><label className="field-label" htmlFor="driver-product">Contenant</label><input id="driver-product" className="text-input" value={form.product} onChange={event => setForm(current => ({ ...current, product: event.target.value }))} /></div><div><label className="field-label" htmlFor="driver-price">Prix FCFA</label><input id="driver-price" className="text-input" type="number" min="1" value={form.unitPrice} onChange={event => setForm(current => ({ ...current, unitPrice: event.target.value }))} /></div></div><button className="primary-button full" onClick={() => void save()} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer mon profil"}</button><p className="modal-note">Un administrateur doit valider le profil avant sa publication côté client.</p></article><section className="section-block driver-orders"><div className="section-heading"><div><span className="eyebrow">Commandes reçues</span><h2>{orders.length ? `${orders.length} demande${orders.length > 1 ? "s" : ""}` : "Aucune demande"}</h2></div><Bell size={18} color="var(--lagoon)" /></div>{orders.length === 0 ? <div className="empty-state compact"><div className="empty-icon"><PackageCheck size={24} /></div><p>Les nouvelles commandes ciblant votre profil apparaîtront ici.</p></div> : <div className="list-stack">{orders.map(order => <article className="order-card" key={order.id}><div className="order-card-top"><div><span className="eyebrow">Nouvelle demande</span><h2>{String(order.livreur.name || "Client Eau Rapide")}</h2></div><span className={`status-pill ${statusStyles[order.status as OrderStatus] || "status-requested"}`}>{order.status}</span></div><div className="order-route"><MapPin size={15} /><span>{order.address}</span></div><div className="order-details"><span>{order.quantity} × {String(order.livreur.product || "Eau")}</span><strong>{formatPrice(order.total)}</strong></div>{order.status !== "Livrée" && order.status !== "Annulée" && <div className="order-actions"><button className="secondary-small" onClick={() => void updateFirebaseOrderStatus(order.id!, order.status === "Demandée" ? "Acceptée" : order.status === "Acceptée" ? "En route" : "Livrée")}>{order.status === "Demandée" ? "Accepter" : order.status === "Acceptée" ? "Partir en livraison" : "Confirmer la livraison"}</button>{order.status === "Demandée" && <button className="ghost-small" onClick={() => void updateFirebaseOrderStatus(order.id!, "Annulée")}>Refuser</button>}</div>}</article>)}</div>}</section><p className="fine-print">Les commandes et votre disponibilité sont synchronisées avec Firebase.</p></section>;
 }
 
 function ProfileView({ userName, onLogin }: { userName?: string | null; onLogin: () => void }) {
@@ -344,5 +394,5 @@ export default function Home() {
   const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
   const displayName = firebaseUser?.email || user?.name;
-  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
+  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
 }

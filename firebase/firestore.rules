@@ -16,10 +16,14 @@ service cloud.firestore {
     }
 
     match /drivers/{driverId} {
-      // Les clients ne voient que les livreurs validés et disponibles.
-      allow read: if signedIn() && resource.data.approved == true;
-      allow create: if isOwner(driverId);
-      allow update: if isOwner(driverId);
+      // Le livreur peut lire son propre profil. Les clients ne voient que les
+      // profils validés et disponibles.
+      allow read: if isOwner(driverId)
+        || (signedIn() && resource.data.approved == true && resource.data.available == true);
+      allow create: if isOwner(driverId)
+        && request.resource.data.approved == false;
+      allow update: if isOwner(driverId)
+        && request.resource.data.approved == resource.data.approved;
       allow delete: if false;
     }
 
@@ -38,9 +42,15 @@ service cloud.firestore {
       allow update: if signedIn()
         && ((resource.data.customerId == request.auth.uid
           && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.driverId == resource.data.driverId
           && request.resource.data.status == 'Annulée')
         || (resource.data.driverId == request.auth.uid
-          && request.resource.data.driverId == resource.data.driverId));
+          && request.resource.data.driverId == resource.data.driverId
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.total == resource.data.total
+          && request.resource.data.address == resource.data.address
+          && request.resource.data.quantity == resource.data.quantity
+          && request.resource.data.status in ['Acceptée', 'En route', 'Livrée', 'Annulée']));
 
       allow delete: if false;
     }
