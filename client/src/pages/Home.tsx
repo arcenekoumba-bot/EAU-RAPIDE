@@ -9,6 +9,7 @@ import {
   Droplets,
   Heart,
   MapPin,
+  LogOut,
   Menu,
   MessageCircle,
   Navigation,
