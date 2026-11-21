@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from "firebase/auth";
 import {
   ArrowRight,
   Bell,
@@ -29,6 +30,7 @@ import { trpc } from "@/lib/trpc";
 import { startLogin } from "@/const";
 import {
   createFirebaseOrder,
+  firebaseAuth,
   loginWithEmail,
   observeDriverOrders,
   observeDriverProfile,
@@ -278,12 +280,67 @@ function ProfileView({ userName, onLogin, onOpenMenu }: { userName?: string | nu
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
+  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [register, setRegister] = useState(false);
   const [busy, setBusy] = useState(false);
+  const verifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  const submit = async () => {
+  useEffect(() => () => {
+    verifierRef.current?.clear();
+    verifierRef.current = null;
+  }, []);
+
+  const sendCode = async () => {
+    const digits = phone.replace(/\\D/g, "").replace(/^0/, "");
+    if (digits.length !== 8) {
+      toast.error("Entrez un numéro gabonais valide à 8 chiffres.");
+      return;
+    }
+    setBusy(true);
+    try {
+      firebaseAuth.languageCode = "fr";
+      if (!verifierRef.current) {
+        verifierRef.current = new RecaptchaVerifier(firebaseAuth, "phone-send-code", { size: "invisible" });
+      }
+      const result = await signInWithPhoneNumber(firebaseAuth, `+241${digits}`, verifierRef.current);
+      setConfirmation(result);
+      toast.success("Code envoyé par SMS", { description: "Saisissez les 6 chiffres reçus sur votre téléphone." });
+    } catch (error) {
+      verifierRef.current?.clear();
+      verifierRef.current = null;
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("auth/too-many-requests")) toast.error("Trop de tentatives. Réessayez un peu plus tard.");
+      else if (message.includes("auth/invalid-phone-number")) toast.error("Ce numéro de téléphone n’est pas valide.");
+      else toast.error("Le SMS n’a pas pu être envoyé. Vérifiez votre connexion et réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    if (!confirmation || !/^\\d{6}$/.test(code.trim())) {
+      toast.error("Entrez le code à 6 chiffres reçu par SMS.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await confirmation.confirm(code.trim());
+      toast.success("Connexion réussie !");
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      toast.error(message.includes("auth/invalid-verification-code") ? "Code incorrect. Vérifiez le SMS reçu." : "Impossible de vérifier ce code. Réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitEmail = async () => {
     if (!email || password.length < 6) {
       toast.error("Renseignez un e-mail et un mot de passe d’au moins 6 caractères.");
       return;
@@ -295,8 +352,8 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       toast.success(register ? "Compte créé" : "Connexion réussie");
       onClose();
     } catch (error) {
-      const code = error instanceof Error ? error.message : "Connexion impossible";
-      toast.error(code.includes("auth/invalid-credential") ? "E-mail ou mot de passe incorrect." : "Impossible de se connecter pour le moment.");
+      const message = error instanceof Error ? error.message : "";
+      toast.error(message.includes("auth/invalid-credential") ? "E-mail ou mot de passe incorrect." : "Impossible de se connecter pour le moment.");
     } finally {
       setBusy(false);
     }
@@ -304,14 +361,33 @@ function AuthModal({ onClose }: { onClose: () => void }) {
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="order-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-      <div className="modal-head"><div><span className="eyebrow">Eau Rapide</span><h2 id="auth-title">{register ? "Créer mon compte" : "Se connecter"}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={19} /></button></div>
-      <p className="modal-note">Votre compte permet de retrouver vos commandes sur plusieurs téléphones.</p>
-      <label className="field-label" htmlFor="auth-email">Adresse e-mail</label>
-      <input id="auth-email" className="text-input" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="vous@example.com" autoComplete="email" />
-      <label className="field-label" htmlFor="auth-password">Mot de passe</label>
-      <input id="auth-password" className="text-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="6 caractères minimum" autoComplete={register ? "new-password" : "current-password"} />
-      <button className="primary-button full" onClick={() => void submit()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte" : "Se connecter"}</button>
-      <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un compte gratuitement"}</button>
+      <div className="modal-head"><div><span className="eyebrow">Eau Rapide</span><h2 id="auth-title">{method === "phone" ? (confirmation ? "Vérifier mon numéro" : "Connexion par SMS") : (register ? "Créer mon compte" : "Connexion par e-mail")}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={19} /></button></div>
+      {method === "phone" ? <>
+        <p className="modal-note">{confirmation ? `Un code de vérification a été envoyé au +241 ${phone}.` : "Entrez votre numéro de téléphone. Nous vous enverrons un code à 6 chiffres par SMS."}</p>
+        {!confirmation ? <>
+          <label className="field-label" htmlFor="auth-phone">Numéro de téléphone</label>
+          <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="auth-phone" className="text-input" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} onChange={event => setPhone(event.target.value.replace(/[^0-9\\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" /></div>
+          <button id="phone-send-code" className="primary-button full" onClick={() => void sendCode()} disabled={busy}>{busy ? "Envoi en cours…" : "Recevoir mon code SMS"}</button>
+          <p className="modal-note">Des frais SMS standards peuvent s’appliquer selon votre opérateur.</p>
+        </> : <>
+          <label className="field-label" htmlFor="auth-code">Code de vérification</label>
+          <input id="auth-code" className="text-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\\D/g, "").slice(0, 6))} placeholder="••••••" />
+          <button className="primary-button full" onClick={() => void verifyCode()} disabled={busy}>{busy ? "Vérification…" : "Valider mon numéro"}</button>
+          <button className="text-button auth-switch" onClick={() => { setConfirmation(null); setCode(""); }}>Modifier le numéro</button>
+          <button className="text-button auth-switch" onClick={() => void sendCode()} disabled={busy}>Renvoyer le code</button>
+        </>}
+        <button className="text-button auth-switch" onClick={() => setMethod("email")}>J’ai déjà un compte e-mail</button>
+        <div id="phone-auth-recaptcha" />
+      </> : <>
+        <p className="modal-note">Vous pouvez toujours utiliser votre ancien compte e-mail et mot de passe.</p>
+        <label className="field-label" htmlFor="auth-email">Adresse e-mail</label>
+        <input id="auth-email" className="text-input" type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="vous@example.com" autoComplete="email" />
+        <label className="field-label" htmlFor="auth-password">Mot de passe</label>
+        <input id="auth-password" className="text-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="6 caractères minimum" autoComplete={register ? "new-password" : "current-password"} />
+        <button className="primary-button full" onClick={() => void submitEmail()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte" : "Se connecter"}</button>
+        <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un compte gratuitement"}</button>
+        <button className="text-button auth-switch" onClick={() => setMethod("phone")}>Continuer avec mon numéro de téléphone</button>
+      </>}
     </section>
   </div>;
 }
@@ -321,7 +397,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("client");
   const [locationLabel, setLocationLabel] = useState("Akanda, Libreville");
   const [selectedLivreur, setSelectedLivreur] = useState<Livreur | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<{ uid: string; email?: string | null } | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<{ uid: string; email?: string | null; phoneNumber?: string | null } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -344,7 +420,7 @@ export default function Home() {
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [menuOpen]);
 
-  useEffect(() => observeFirebaseUser(nextUser => setFirebaseUser(nextUser ? { uid: nextUser.uid, email: nextUser.email } : null)), []);
+  useEffect(() => observeFirebaseUser(nextUser => setFirebaseUser(nextUser ? { uid: nextUser.uid, email: nextUser.email, phoneNumber: nextUser.phoneNumber } : null)), []);
 
   useEffect(() => {
     if (!firebaseUser) return;
@@ -428,6 +504,6 @@ export default function Home() {
   };
   const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
-  const displayName = firebaseUser?.email || user?.name;
+  const displayName = firebaseUser?.email || firebaseUser?.phoneNumber || user?.name;
   return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{menuOpen && <div className="account-drawer-backdrop" onClick={() => setMenuOpen(false)}><aside className="account-drawer" role="dialog" aria-modal="true" aria-label="Menu Eau Rapide" onClick={event => event.stopPropagation()}><div className="account-drawer-header"><div className="account-drawer-brand"><BrandMark /><div><strong>Eau Rapide</strong><span>{displayName || "Votre espace"}</span></div></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X size={19} /></button></div><div className="account-drawer-section"><span className="eyebrow">Navigation</span><button onClick={() => navigateFromMenu("accueil")}><Navigation size={18} /><span>Accueil</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("commandes")}><PackageCheck size={18} /><span>Mes commandes</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("profil")}><UserRound size={18} /><span>Mon espace</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("livreur")}><Truck size={18} /><span>Je suis livreur</span><ChevronRight size={17} /></button></div><div className="account-drawer-section muted-section"><span className="eyebrow">Prochainement</span><div className="drawer-coming-soon"><Bell size={18} /><span>Centre de notifications</span><small>Bientôt</small></div><div className="drawer-coming-soon"><MessageCircle size={18} /><span>Centre d’aide</span><small>Bientôt</small></div></div><div className="account-drawer-footer">{firebaseUser ? <button className="drawer-logout" onClick={() => void logout()}><LogOut size={18} /><span>Déconnexion</span></button> : <button className="drawer-login" onClick={login}><UserRound size={18} /><span>Se connecter</span></button>}<p>Version pilote · Eau Rapide</p></div></aside></div>}{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
 }
