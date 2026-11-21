@@ -308,3 +308,7 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 @media (prefers-reduced-motion: reduce) {
   .account-drawer-backdrop, .account-drawer { animation: none; }
 }
+
+.phone-auth-input { display: flex; align-items: center; gap: 9px; }
+.phone-auth-input > span { flex: 0 0 auto; color: var(--ink); background: #f1f6f3; border: 1px solid var(--line); border-radius: 10px; padding: 11px 10px; font-size: 12px; font-weight: 700; }
+.phone-auth-input .text-input { min-width: 0; flex: 1; }
