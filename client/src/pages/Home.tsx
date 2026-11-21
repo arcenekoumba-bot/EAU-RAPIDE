@@ -296,7 +296,7 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   const sendCode = async () => {
-    const digits = phone.replace(/\\D/g, "").replace(/^241/, "");
+    const digits = phone.replace(/\D/g, "").replace(/^241/, "");
     if (digits.length !== 8) {
       toast.error("Entrez un numéro gabonais valide à 8 chiffres.");
       return;
@@ -323,7 +323,7 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   };
 
   const verifyCode = async () => {
-    if (!confirmation || !/^\\d{6}$/.test(code.trim())) {
+    if (!confirmation || !/^\d{6}$/.test(code.trim())) {
       toast.error("Entrez le code à 6 chiffres reçu par SMS.");
       return;
     }
@@ -366,12 +366,12 @@ function AuthModal({ onClose }: { onClose: () => void }) {
         <p className="modal-note">{confirmation ? `Un code de vérification a été envoyé au +241 ${phone}.` : "Entrez votre numéro de téléphone. Nous vous enverrons un code à 6 chiffres par SMS."}</p>
         {!confirmation ? <>
           <label className="field-label" htmlFor="auth-phone">Numéro de téléphone</label>
-          <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="auth-phone" className="text-input" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} onChange={event => setPhone(event.target.value.replace(/[^0-9\\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" /></div>
+          <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="auth-phone" className="text-input" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} onChange={event => setPhone(event.target.value.replace(/[^0-9\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" /></div>
           <button id="phone-send-code" className="primary-button full" onClick={() => void sendCode()} disabled={busy}>{busy ? "Envoi en cours…" : "Recevoir mon code SMS"}</button>
           <p className="modal-note">Des frais SMS standards peuvent s’appliquer selon votre opérateur.</p>
         </> : <>
           <label className="field-label" htmlFor="auth-code">Code de vérification</label>
-          <input id="auth-code" className="text-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\\D/g, "").slice(0, 6))} placeholder="••••••" />
+          <input id="auth-code" className="text-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" />
           <button className="primary-button full" onClick={() => void verifyCode()} disabled={busy}>{busy ? "Vérification…" : "Valider mon numéro"}</button>
           <button className="text-button auth-switch" onClick={() => { setConfirmation(null); setCode(""); }}>Modifier le numéro</button>
           <button className="text-button auth-switch" onClick={() => void sendCode()} disabled={busy}>Renvoyer le code</button>
