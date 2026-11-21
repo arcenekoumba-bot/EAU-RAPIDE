@@ -9,6 +9,7 @@ import {
   Droplets,
   Heart,
   MapPin,
+  LogOut,
   Menu,
   MessageCircle,
   Navigation,
@@ -36,6 +37,7 @@ import {
   registerWithEmail,
   saveDriverProfile,
   setDriverAvailability,
+  logoutFromFirebase,
   updateFirebaseOrderStatus,
   type FirebaseDriver,
   type FirebaseOrder,
@@ -271,8 +273,8 @@ function DriverView({ onLogin, userId }: { onLogin: () => void; userId?: string 
   return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Espace partenaire</span><h1>Je suis livreur</h1></div><span className={profile?.approved ? "status-pill status-delivered" : "status-pill status-requested"}>{profile?.approved ? "Profil validé" : "À valider"}</span></div><div className="driver-hero"><div className="driver-hero-icon"><Truck size={27} /></div><div><span className="eyebrow">Votre activité</span><h2>Recevez les demandes autour de vous.</h2><p>Votre disponibilité reste sous votre contrôle. La position exacte du client n’est visible qu’avec une commande.</p></div></div><article className="availability-card"><div><span className="eyebrow">Statut en direct</span><h2>{profile?.available ? "Vous êtes visible" : "Vous êtes hors ligne"}</h2><p>{profile?.available ? "Les clients peuvent vous trouver dans votre zone." : "Enregistrez votre profil puis activez votre disponibilité."}</p></div><button className={profile?.available ? "availability-toggle on" : "availability-toggle"} onClick={() => void toggleAvailability()} aria-pressed={profile?.available ?? false}><span /></button></article><article className="driver-form-card"><div className="section-heading"><div><span className="eyebrow">Votre profil</span><h2>{profile ? "Modifier mes informations" : "Créer mon profil"}</h2></div><ShieldCheck size={19} className="verified-icon" /></div><label className="field-label" htmlFor="driver-name">Nom affiché</label><input id="driver-name" className="text-input" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="Ex. Grâce Services" /><label className="field-label" htmlFor="driver-zone">Zone de livraison</label><input id="driver-zone" className="text-input" value={form.zone} onChange={event => setForm(current => ({ ...current, zone: event.target.value }))} placeholder="Ex. Akanda · La Sablière" /><label className="field-label" htmlFor="driver-phone">Téléphone WhatsApp</label><input id="driver-phone" className="text-input" type="tel" value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))} placeholder="+241 ..." /><div className="form-row"><div><label className="field-label" htmlFor="driver-product">Contenant</label><input id="driver-product" className="text-input" value={form.product} onChange={event => setForm(current => ({ ...current, product: event.target.value }))} /></div><div><label className="field-label" htmlFor="driver-price">Prix FCFA</label><input id="driver-price" className="text-input" type="number" min="1" value={form.unitPrice} onChange={event => setForm(current => ({ ...current, unitPrice: event.target.value }))} /></div></div><button className="primary-button full" onClick={() => void save()} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer mon profil"}</button><p className="modal-note">Un administrateur doit valider le profil avant sa publication côté client.</p></article><section className="section-block driver-orders"><div className="section-heading"><div><span className="eyebrow">Commandes reçues</span><h2>{orders.length ? `${orders.length} demande${orders.length > 1 ? "s" : ""}` : "Aucune demande"}</h2></div><Bell size={18} color="var(--lagoon)" /></div>{orders.length === 0 ? <div className="empty-state compact"><div className="empty-icon"><PackageCheck size={24} /></div><p>Les nouvelles commandes ciblant votre profil apparaîtront ici.</p></div> : <div className="list-stack">{orders.map(order => <article className="order-card" key={order.id}><div className="order-card-top"><div><span className="eyebrow">Nouvelle demande</span><h2>{String(order.livreur.name || "Client Eau Rapide")}</h2></div><span className={`status-pill ${statusStyles[order.status as OrderStatus] || "status-requested"}`}>{order.status}</span></div><div className="order-route"><MapPin size={15} /><span>{order.address}</span></div><div className="order-details"><span>{order.quantity} × {String(order.livreur.product || "Eau")}</span><strong>{formatPrice(order.total)}</strong></div>{order.status !== "Livrée" && order.status !== "Annulée" && <div className="order-actions"><button className="secondary-small" onClick={() => void updateFirebaseOrderStatus(order.id!, order.status === "Demandée" ? "Acceptée" : order.status === "Acceptée" ? "En route" : "Livrée")}>{order.status === "Demandée" ? "Accepter" : order.status === "Acceptée" ? "Partir en livraison" : "Confirmer la livraison"}</button>{order.status === "Demandée" && <button className="ghost-small" onClick={() => void updateFirebaseOrderStatus(order.id!, "Annulée")}>Refuser</button>}</div>}</article>)}</div>}</section><p className="fine-print">Les commandes et votre disponibilité sont synchronisées avec Firebase.</p></section>;
 }
 
-function ProfileView({ userName, onLogin }: { userName?: string | null; onLogin: () => void }) {
-  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div><button className="icon-button"><Menu size={18} /></button></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
+function ProfileView({ userName, onLogin, onOpenMenu }: { userName?: string | null; onLogin: () => void; onOpenMenu: () => void }) {
+  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div><button className="icon-button" onClick={onOpenMenu} aria-label="Ouvrir le menu"><Menu size={18} /></button></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
@@ -321,6 +323,7 @@ export default function Home() {
   const [selectedLivreur, setSelectedLivreur] = useState<Livreur | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<{ uid: string; email?: string | null } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>(() => {
     try { return JSON.parse(localStorage.getItem("eau-rapide-orders") || "[]") as Order[]; } catch { return []; }
   });
@@ -331,6 +334,15 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("eau-rapide-orders", JSON.stringify(orders));
   }, [orders]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   useEffect(() => observeFirebaseUser(nextUser => setFirebaseUser(nextUser ? { uid: nextUser.uid, email: nextUser.email } : null)), []);
 
@@ -351,6 +363,29 @@ export default function Home() {
 
   const login = () => {
     setAuthOpen(true);
+    setMenuOpen(false);
+  };
+
+  const logout = async () => {
+    if (!window.confirm("Voulez-vous vraiment vous déconnecter de votre compte Eau Rapide ?")) return;
+    try {
+      await logoutFromFirebase();
+      setMenuOpen(false);
+      toast.success("Vous êtes déconnecté(e).");
+    } catch {
+      toast.error("La déconnexion a échoué. Réessayez.");
+    }
+  };
+
+  const navigateFromMenu = (destination: "accueil" | "commandes" | "profil" | "livreur") => {
+    if (destination === "livreur") {
+      setMode("livreur");
+      setActiveTab("profil");
+    } else {
+      setMode("client");
+      setActiveTab(destination);
+    }
+    setMenuOpen(false);
   };
 
   const locate = () => {
@@ -394,5 +429,5 @@ export default function Home() {
   const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
   const displayName = firebaseUser?.email || user?.name;
-  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
+  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{menuOpen && <div className="account-drawer-backdrop" onClick={() => setMenuOpen(false)}><aside className="account-drawer" role="dialog" aria-modal="true" aria-label="Menu Eau Rapide" onClick={event => event.stopPropagation()}><div className="account-drawer-header"><div className="account-drawer-brand"><BrandMark /><div><strong>Eau Rapide</strong><span>{displayName || "Votre espace"}</span></div></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X size={19} /></button></div><div className="account-drawer-section"><span className="eyebrow">Navigation</span><button onClick={() => navigateFromMenu("accueil")}><Navigation size={18} /><span>Accueil</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("commandes")}><PackageCheck size={18} /><span>Mes commandes</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("profil")}><UserRound size={18} /><span>Mon espace</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("livreur")}><Truck size={18} /><span>Je suis livreur</span><ChevronRight size={17} /></button></div><div className="account-drawer-section muted-section"><span className="eyebrow">Prochainement</span><div className="drawer-coming-soon"><Bell size={18} /><span>Centre de notifications</span><small>Bientôt</small></div><div className="drawer-coming-soon"><MessageCircle size={18} /><span>Centre d’aide</span><small>Bientôt</small></div></div><div className="account-drawer-footer">{firebaseUser ? <button className="drawer-logout" onClick={() => void logout()}><LogOut size={18} /><span>Déconnexion</span></button> : <button className="drawer-login" onClick={login}><UserRound size={18} /><span>Se connecter</span></button>}<p>Version pilote · Eau Rapide</p></div></aside></div>}{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
 }

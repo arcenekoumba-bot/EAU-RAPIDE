@@ -237,3 +237,74 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
   .card-actions { flex-wrap: wrap; justify-content: end; }
   .primary-small { padding-right: 9px; padding-left: 9px; }
 }
+
+
+/* Mobile account drawer */
+.account-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(9, 30, 28, .48);
+  backdrop-filter: blur(2px);
+  animation: drawer-fade-in .2s ease-out;
+}
+.account-drawer {
+  display: flex;
+  flex-direction: column;
+  width: min(88vw, 390px);
+  height: 100%;
+  overflow-y: auto;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(18px, env(safe-area-inset-bottom));
+  color: var(--ink);
+  background: var(--canvas);
+  box-shadow: -18px 0 50px rgba(0, 0, 0, .16);
+  animation: drawer-slide-in .26s cubic-bezier(.2,.75,.25,1);
+}
+.account-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.account-drawer-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.account-drawer-brand strong, .account-drawer-brand span { display: block; }
+.account-drawer-brand strong { font-size: 17px; font-weight: 850; }
+.account-drawer-brand span { max-width: 230px; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.account-drawer-section { display: grid; gap: 7px; padding: 23px 0; border-bottom: 1px solid var(--line); }
+.account-drawer-section > .eyebrow { margin: 0 0 5px 3px; }
+.account-drawer-section > button, .drawer-coming-soon {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 49px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  text-align: left;
+}
+.account-drawer-section > button { cursor: pointer; }
+.account-drawer-section > button:active { background: var(--lagoon-soft); }
+.account-drawer-section > button svg:first-child, .drawer-coming-soon svg { color: var(--lagoon); flex: 0 0 auto; }
+.account-drawer-section > button span, .drawer-coming-soon span { flex: 1; font-size: 13px; font-weight: 700; }
+.account-drawer-section > button svg:last-child { color: var(--muted); }
+.muted-section { border-bottom: 0; }
+.drawer-coming-soon { color: var(--muted); background: rgba(255,255,255,.55); }
+.drawer-coming-soon span { color: var(--muted); }
+.drawer-coming-soon small { color: var(--muted); font-size: 10px; }
+.account-drawer-footer { margin-top: auto; padding-top: 20px; }
+.drawer-logout, .drawer-login { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 48px; padding: 0 13px; border-radius: 12px; font-size: 13px; font-weight: 800; cursor: pointer; }
+.drawer-logout { color: #a63f38; background: #f8e9e6; }
+.drawer-login { color: white; background: var(--lagoon); }
+.account-drawer-footer p { margin-top: 14px; color: var(--muted); font-size: 10px; text-align: center; }
+@keyframes drawer-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drawer-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .account-drawer-backdrop, .account-drawer { animation: none; }
+}
