@@ -296,7 +296,7 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   const sendCode = async () => {
-    const digits = phone.replace(/\\D/g, "").replace(/^0/, "");
+    const digits = phone.replace(/\\D/g, "").replace(/^241/, "");
     if (digits.length !== 8) {
       toast.error("Entrez un numéro gabonais valide à 8 chiffres.");
       return;
