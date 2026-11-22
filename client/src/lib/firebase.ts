@@ -102,7 +102,8 @@ export async function saveDriverProfile(userId: string, profile: Omit<FirebaseDr
   const current = existing.exists() ? existing.data() : {};
   await setDoc(doc(firestore, "drivers", userId), {
     ...profile,
-    approved: current.approved === true,
+    // Les nouveaux profils sont publiés immédiatement après validation des champs.
+    approved: true,
     rating: typeof current.rating === "number" ? current.rating : 0,
     deliveries: typeof current.deliveries === "number" ? current.deliveries : 0,
     updatedAt: serverTimestamp(),
