@@ -97,6 +97,17 @@ export function observeDriverProfile(userId: string, callback: (profile: Firebas
   }, error => console.warn("Firestore driver profile:", error.message));
 }
 
+export function observeAvailableDrivers(callback: (drivers: FirebaseDriver[]) => void): Unsubscribe {
+  const availableQuery = query(
+    collection(firestore, "drivers"),
+    where("approved", "==", true),
+    where("available", "==", true),
+  );
+  return onSnapshot(availableQuery, snapshot => {
+    callback(snapshot.docs.map(item => ({ ...item.data(), id: item.id } as FirebaseDriver)));
+  }, error => console.warn("Firestore available drivers:", error.message));
+}
+
 export async function saveDriverProfile(userId: string, profile: Omit<FirebaseDriver, "id" | "updatedAt" | "approved" | "rating" | "deliveries">) {
   const existing = await getDoc(doc(firestore, "drivers", userId));
   const current = existing.exists() ? existing.data() : {};
