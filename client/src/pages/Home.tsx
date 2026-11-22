@@ -298,6 +298,7 @@ function AccountSettingsModal({ section, settings, livreurs, onClose, onSave }: 
   const update = async (next: CustomerSettings) => {
     setSaving(true);
     try { await onSave(next); }
+    catch { /* Le parent affiche le message d’erreur. */ }
     finally { setSaving(false); }
   };
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -325,7 +326,7 @@ function AccountSettingsModal({ section, settings, livreurs, onClose, onSave }: 
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
-  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [method, setMethod] = useState<"phone" | "email">("email");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
@@ -431,7 +432,7 @@ function AuthModal({ onClose }: { onClose: () => void }) {
         <input id="auth-password" className="text-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="6 caractères minimum" autoComplete={register ? "new-password" : "current-password"} />
         <button className="primary-button full" onClick={() => void submitEmail()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte" : "Se connecter"}</button>
         <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un compte gratuitement"}</button>
-        <button className="text-button auth-switch" onClick={() => setMethod("phone")}>Continuer avec mon numéro de téléphone</button>
+        <button className="text-button auth-switch" onClick={() => toast("La connexion par numéro + PIN sans SMS arrive dans une prochaine mise à jour. Aucun SMS ne sera envoyé.")}>Inscription par numéro + code PIN (bientôt)</button>
       </>}
     </section>
   </div>;
@@ -522,7 +523,7 @@ export default function Home() {
   const persistCustomerSettings = async (next: CustomerSettings) => {
     if (!firebaseUser) return;
     try { await saveCustomerSettings(firebaseUser.uid, next); setCustomerSettings(next); toast.success("Vos préférences ont été enregistrées."); }
-    catch { toast.error("Impossible d’enregistrer vos préférences. Réessayez."); throw new Error("settings-save-failed"); }
+    catch { toast.error("Impossible d’enregistrer vos préférences. Réessayez."); }
   };
 
   const toggleFavorite = (id: string) => {
