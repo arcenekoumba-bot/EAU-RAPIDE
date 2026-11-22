@@ -51,7 +51,7 @@ h1 { color: var(--ink); font-size: clamp(27px, 7vw, 38px); line-height: 1.04; le
 h1 em { color: var(--lagoon); font-style: normal; }
 h2 { color: var(--ink); font-size: 22px; letter-spacing: -.04em; }
 h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
-.menu-button { display: none; }
+.menu-button { display: grid; }
 .location-bar { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 15px; padding: 11px 13px; margin: 20px 0 14px; box-shadow: 0 6px 18px rgba(23, 63, 57, .03); cursor: pointer; }
 .location-bar > span:nth-child(2) { flex: 1; }
 .location-bar small, .location-bar strong { display: block; }
@@ -308,3 +308,17 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 @media (prefers-reduced-motion: reduce) {
   .account-drawer-backdrop, .account-drawer { animation: none; }
 }
+
+.phone-auth-input { display: flex; align-items: center; gap: 9px; }
+.phone-auth-input > span { flex: 0 0 auto; color: var(--ink); background: #f1f6f3; border: 1px solid var(--line); border-radius: 10px; padding: 11px 10px; font-size: 12px; font-weight: 700; }
+.phone-auth-input .text-input { min-width: 0; flex: 1; }
+
+
+/* Account settings and saved preferences */
+.settings-modal-list { margin-top: 14px; }
+.settings-modal-list .order-card { padding: 13px; }
+.settings-modal-list .order-card-top { align-items: flex-start; gap: 10px; }
+.settings-modal-list .order-card-top > strong { overflow-wrap: anywhere; }
+.settings-modal-list .modal-note { margin-top: 6px; }
+.settings-modal-list .order-actions { flex-wrap: wrap; }
+button:disabled { opacity: .55; cursor: not-allowed; }

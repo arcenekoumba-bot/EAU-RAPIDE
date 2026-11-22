@@ -41,6 +41,30 @@ export const loginWithEmail = (email: string, password: string) => signInWithEma
 export const registerWithEmail = (email: string, password: string) => createUserWithEmailAndPassword(firebaseAuth, email, password);
 export const logoutFromFirebase = () => signOut(firebaseAuth);
 
+export type CustomerSettings = {
+  addresses: string[];
+  defaultAddress: string;
+  favoriteDriverIds: string[];
+};
+
+export function observeCustomerSettings(userId: string, callback: (settings: CustomerSettings) => void): Unsubscribe {
+  return onSnapshot(doc(firestore, "users", userId), snapshot => {
+    const data = snapshot.data() || {};
+    callback({
+      addresses: Array.isArray(data.addresses) ? data.addresses.filter((value): value is string => typeof value === "string") : [],
+      defaultAddress: typeof data.defaultAddress === "string" ? data.defaultAddress : "",
+      favoriteDriverIds: Array.isArray(data.favoriteDriverIds) ? data.favoriteDriverIds.filter((value): value is string => typeof value === "string") : [],
+    });
+  }, error => console.warn("Firestore customer settings:", error.message));
+}
+
+export async function saveCustomerSettings(userId: string, settings: CustomerSettings) {
+  await setDoc(doc(firestore, "users", userId), {
+    ...settings,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
 export type FirebaseOrder = {
   id?: string;
   customerId: string;
@@ -97,12 +121,24 @@ export function observeDriverProfile(userId: string, callback: (profile: Firebas
   }, error => console.warn("Firestore driver profile:", error.message));
 }
 
+export function observeAvailableDrivers(callback: (drivers: FirebaseDriver[]) => void): Unsubscribe {
+  const availableQuery = query(
+    collection(firestore, "drivers"),
+    where("approved", "==", true),
+    where("available", "==", true),
+  );
+  return onSnapshot(availableQuery, snapshot => {
+    callback(snapshot.docs.map(item => ({ ...item.data(), id: item.id } as FirebaseDriver)));
+  }, error => console.warn("Firestore available drivers:", error.message));
+}
+
 export async function saveDriverProfile(userId: string, profile: Omit<FirebaseDriver, "id" | "updatedAt" | "approved" | "rating" | "deliveries">) {
   const existing = await getDoc(doc(firestore, "drivers", userId));
   const current = existing.exists() ? existing.data() : {};
   await setDoc(doc(firestore, "drivers", userId), {
     ...profile,
-    approved: current.approved === true,
+    // Les nouveaux profils sont publiés immédiatement après validation des champs.
+    approved: true,
     rating: typeof current.rating === "number" ? current.rating : 0,
     deliveries: typeof current.deliveries === "number" ? current.deliveries : 0,
     updatedAt: serverTimestamp(),
