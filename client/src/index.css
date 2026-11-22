@@ -312,3 +312,13 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
 .phone-auth-input { display: flex; align-items: center; gap: 9px; }
 .phone-auth-input > span { flex: 0 0 auto; color: var(--ink); background: #f1f6f3; border: 1px solid var(--line); border-radius: 10px; padding: 11px 10px; font-size: 12px; font-weight: 700; }
 .phone-auth-input .text-input { min-width: 0; flex: 1; }
+
+
+/* Account settings and saved preferences */
+.settings-modal-list { margin-top: 14px; }
+.settings-modal-list .order-card { padding: 13px; }
+.settings-modal-list .order-card-top { align-items: flex-start; gap: 10px; }
+.settings-modal-list .order-card-top > strong { overflow-wrap: anywhere; }
+.settings-modal-list .modal-note { margin-top: 6px; }
+.settings-modal-list .order-actions { flex-wrap: wrap; }
+button:disabled { opacity: .55; cursor: not-allowed; }
