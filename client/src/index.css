@@ -51,7 +51,7 @@ h1 { color: var(--ink); font-size: clamp(27px, 7vw, 38px); line-height: 1.04; le
 h1 em { color: var(--lagoon); font-style: normal; }
 h2 { color: var(--ink); font-size: 22px; letter-spacing: -.04em; }
 h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
-.menu-button { display: none; }
+.menu-button { display: grid; }
 .location-bar { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 15px; padding: 11px 13px; margin: 20px 0 14px; box-shadow: 0 6px 18px rgba(23, 63, 57, .03); cursor: pointer; }
 .location-bar > span:nth-child(2) { flex: 1; }
 .location-bar small, .location-bar strong { display: block; }
