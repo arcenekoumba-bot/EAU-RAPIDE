@@ -51,7 +51,6 @@ h1 { color: var(--ink); font-size: clamp(27px, 7vw, 38px); line-height: 1.04; le
 h1 em { color: var(--lagoon); font-style: normal; }
 h2 { color: var(--ink); font-size: 22px; letter-spacing: -.04em; }
 h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
-.menu-button { display: none; }
 .location-bar { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 15px; padding: 11px 13px; margin: 20px 0 14px; box-shadow: 0 6px 18px rgba(23, 63, 57, .03); cursor: pointer; }
 .location-bar > span:nth-child(2) { flex: 1; }
 .location-bar small, .location-bar strong { display: block; }
@@ -221,9 +220,6 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
   .hero-card { max-width: 700px; min-height: 245px; padding: 31px 30px; }
   .hero-art { right: 34px; transform: scale(1.25) rotate(11deg); }
   .quick-stats, .section-block, .trust-strip, .page-section { max-width: 700px; }
-  .bottom-nav { position: fixed; top: 104px; right: max(16px, calc((100vw - 1120px) / 2)); bottom: auto; left: auto; width: 176px; height: auto; flex-direction: column; padding: 8px; border: 1px solid var(--line); border-radius: 17px; box-shadow: var(--shadow); }
-  .nav-item { max-width: none; min-height: 44px; flex-direction: row; justify-content: flex-start; padding: 0 13px; gap: 11px; font-size: 11px; }
-  .menu-button { display: grid; }
 }
 
 @media (max-width: 420px) {
@@ -236,4 +232,13 @@ h3 { color: var(--ink); font-size: 15px; letter-spacing: -.025em; }
   .livreur-card-bottom { align-items: end; }
   .card-actions { flex-wrap: wrap; justify-content: end; }
   .primary-small { padding-right: 9px; padding-left: 9px; }
+}
+
+@media (min-width: 760px) and (max-width: 1083px) {
+  .app-shell { padding-bottom: 90px; }
+}
+
+@media (min-width: 1084px) {
+  .bottom-nav { position: fixed; top: 104px; right: max(16px, calc((100vw - 1120px) / 2)); bottom: auto; left: auto; width: 176px; height: auto; flex-direction: column; padding: 8px; border: 1px solid var(--line); border-radius: 17px; box-shadow: var(--shadow); }
+  .nav-item { max-width: none; min-height: 44px; flex-direction: row; justify-content: flex-start; padding: 0 13px; gap: 11px; font-size: 11px; }
 }

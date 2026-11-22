@@ -9,7 +9,6 @@ import {
   Droplets,
   Heart,
   MapPin,
-  Menu,
   MessageCircle,
   Navigation,
   PackageCheck,
@@ -200,7 +199,7 @@ function ClientHome({ livreurs, onOrder, onLocate, locationLabel }: { livreurs: 
     <>
       <section className="welcome-row">
         <div><span className="eyebrow">Bonjour, bienvenue</span><h1>De l’eau, <em>sans détour.</em></h1></div>
-        <button className="icon-button menu-button" aria-label="Ouvrir le menu"><Menu size={20} /></button>
+
       </section>
       <button className="location-bar" onClick={onLocate}><span className="location-icon"><MapPin size={17} /></span><span><small>Livrer à</small><strong>{locationLabel}</strong></span><ChevronRight size={18} /></button>
       <section className="hero-card">
@@ -272,7 +271,7 @@ function DriverView({ onLogin, userId }: { onLogin: () => void; userId?: string 
 }
 
 function ProfileView({ userName, onLogin }: { userName?: string | null; onLogin: () => void }) {
-  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div><button className="icon-button"><Menu size={18} /></button></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
+  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
@@ -394,5 +393,5 @@ export default function Home() {
   const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
   const displayName = firebaseUser?.email || user?.name;
-  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
+  return <div className="app-shell"><Header userName={displayName} onLogin={login} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} />}</main>{mode === "client" && <BottomNav activeTab={activeTab} onChange={setActiveTab} />}{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
 }
