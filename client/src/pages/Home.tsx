@@ -44,6 +44,9 @@ import {
   updateFirebaseOrderStatus,
   type FirebaseDriver,
   type FirebaseOrder,
+  observeCustomerSettings,
+  saveCustomerSettings,
+  type CustomerSettings,
 } from "@/lib/firebase";
 
 type Tab = "accueil" | "commandes" | "profil";
@@ -140,7 +143,7 @@ function BottomNav({ activeTab, onChange }: { activeTab: Tab; onChange: (tab: Ta
   );
 }
 
-function LivreurCard({ livreur, onOrder }: { livreur: Livreur; onOrder: (livreur: Livreur) => void }) {
+function LivreurCard({ livreur, onOrder, isFavorite, onToggleFavorite }: { livreur: Livreur; onOrder: (livreur: Livreur) => void; isFavorite: boolean; onToggleFavorite: (id: string) => void }) {
   return (
     <article className="livreur-card">
       <div className="livreur-card-head">
@@ -167,7 +170,7 @@ function LivreurCard({ livreur, onOrder }: { livreur: Livreur; onOrder: (livreur
         <div className="card-actions">
           <a className="round-action" href={`tel:${livreur.phone.replaceAll(" ", "")}`} aria-label={`Appeler ${livreur.name}`}><Phone size={17} /></a>
           <a className="round-action" href={`https://wa.me/${livreur.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer" aria-label={`Écrire à ${livreur.name}`}><MessageCircle size={17} /></a>
-          <button className="primary-small" onClick={() => onOrder(livreur)}>Commander <ArrowRight size={15} /></button>
+          <button className="round-action" onClick={() => onToggleFavorite(livreur.id)} aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"} aria-pressed={isFavorite}><Heart size={16} fill={isFavorite ? "currentColor" : "none"} /></button><button className="primary-small" onClick={() => onOrder(livreur)}>Commander <ArrowRight size={15} /></button>
         </div>
       </div>
     </article>
@@ -200,7 +203,7 @@ function OrderModal({ livreur, onClose, onConfirm }: { livreur: Livreur; onClose
   );
 }
 
-function ClientHome({ livreurs, onOrder, onLocate, locationLabel, onOpenMenu }: { livreurs: Livreur[]; onOrder: (livreur: Livreur) => void; onLocate: () => void; locationLabel: string; onOpenMenu: () => void }) {
+function ClientHome({ livreurs, onOrder, onLocate, locationLabel, onOpenMenu, favoriteIds, onToggleFavorite }: { livreurs: Livreur[]; onOrder: (livreur: Livreur) => void; onLocate: () => void; locationLabel: string; onOpenMenu: () => void; favoriteIds: string[]; onToggleFavorite: (id: string) => void }) {
   return (
     <>
       <section className="welcome-row">
@@ -213,7 +216,7 @@ function ClientHome({ livreurs, onOrder, onLocate, locationLabel, onOpenMenu }: 
         <div className="hero-art" aria-hidden="true"><Droplets size={92} strokeWidth={1.2} /><div className="hero-ripple ripple-one" /><div className="hero-ripple ripple-two" /></div>
       </section>
       <section className="quick-stats"><div><strong>15–25</strong><span>min moyen</span></div><div><strong>4.8/5</strong><span>note service</span></div><div><strong>7j/7</strong><span>disponible</span></div></section>
-      <section className="section-block"><div className="section-heading"><div><span className="eyebrow">À proximité</span><h2>Livreurs disponibles</h2></div><button className="text-button" onClick={onLocate}><Search size={15} /> Rechercher</button></div><div className="list-stack">{livreurs.map(livreur => <LivreurCard key={livreur.id} livreur={livreur} onOrder={onOrder} />)}</div></section>
+      <section className="section-block"><div className="section-heading"><div><span className="eyebrow">À proximité</span><h2>Livreurs disponibles</h2></div><button className="text-button" onClick={onLocate}><Search size={15} /> Rechercher</button></div><div className="list-stack">{livreurs.map(livreur => <LivreurCard key={livreur.id} livreur={livreur} onOrder={onOrder} isFavorite={favoriteIds.includes(livreur.id)} onToggleFavorite={onToggleFavorite} />)}</div></section>
       <section className="trust-strip"><ShieldCheck size={21} /><div><strong>Des livreurs vérifiés</strong><span>Chaque profil est contrôlé avant d’être visible.</span></div><ChevronRight size={17} /></section>
       <p className="pilot-note"><CheckCircle2 size={14} /> Mode pilote : les commandes restent enregistrées sur ce téléphone.</p>
     </>
@@ -276,8 +279,49 @@ function DriverView({ onLogin, userId }: { onLogin: () => void; userId?: string 
   return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Espace partenaire</span><h1>Je suis livreur</h1></div><span className={profile?.approved ? "status-pill status-delivered" : "status-pill status-requested"}>{profile?.approved ? "Profil publié" : "À publier"}</span></div><div className="driver-hero"><div className="driver-hero-icon"><Truck size={27} /></div><div><span className="eyebrow">Votre activité</span><h2>Recevez les demandes autour de vous.</h2><p>Votre disponibilité reste sous votre contrôle. La position exacte du client n’est visible qu’avec une commande.</p></div></div><article className="availability-card"><div><span className="eyebrow">Statut en direct</span><h2>{profile?.available ? "Vous êtes visible" : "Vous êtes hors ligne"}</h2><p>{profile?.available ? "Les clients peuvent vous trouver dans votre zone." : "Enregistrez votre profil puis activez votre disponibilité."}</p></div><button className={profile?.available ? "availability-toggle on" : "availability-toggle"} onClick={() => void toggleAvailability()} aria-pressed={profile?.available ?? false}><span /></button></article><article className="driver-form-card"><div className="section-heading"><div><span className="eyebrow">Votre profil</span><h2>{profile ? "Modifier mes informations" : "Créer mon profil"}</h2></div><ShieldCheck size={19} className="verified-icon" /></div><label className="field-label" htmlFor="driver-name">Nom affiché</label><input id="driver-name" className="text-input" value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="Ex. Grâce Services" /><label className="field-label" htmlFor="driver-zone">Zone de livraison</label><input id="driver-zone" className="text-input" value={form.zone} onChange={event => setForm(current => ({ ...current, zone: event.target.value }))} placeholder="Ex. Akanda · La Sablière" /><label className="field-label" htmlFor="driver-phone">Téléphone WhatsApp</label><input id="driver-phone" className="text-input" type="tel" value={form.phone} onChange={event => setForm(current => ({ ...current, phone: event.target.value }))} placeholder="+241 ..." /><div className="form-row"><div><label className="field-label" htmlFor="driver-product">Contenant</label><input id="driver-product" className="text-input" value={form.product} onChange={event => setForm(current => ({ ...current, product: event.target.value }))} /></div><div><label className="field-label" htmlFor="driver-price">Prix FCFA</label><input id="driver-price" className="text-input" type="number" min="1" value={form.unitPrice} onChange={event => setForm(current => ({ ...current, unitPrice: event.target.value }))} /></div></div><button className="primary-button full" onClick={() => void save()} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer mon profil"}</button><p className="modal-note">Votre profil est publié dès son enregistrement. Vous pouvez désactiver votre disponibilité à tout moment.</p></article><section className="section-block driver-orders"><div className="section-heading"><div><span className="eyebrow">Commandes reçues</span><h2>{orders.length ? `${orders.length} demande${orders.length > 1 ? "s" : ""}` : "Aucune demande"}</h2></div><Bell size={18} color="var(--lagoon)" /></div>{orders.length === 0 ? <div className="empty-state compact"><div className="empty-icon"><PackageCheck size={24} /></div><p>Les nouvelles commandes ciblant votre profil apparaîtront ici.</p></div> : <div className="list-stack">{orders.map(order => <article className="order-card" key={order.id}><div className="order-card-top"><div><span className="eyebrow">Nouvelle demande</span><h2>{String(order.livreur.name || "Client Eau Rapide")}</h2></div><span className={`status-pill ${statusStyles[order.status as OrderStatus] || "status-requested"}`}>{order.status}</span></div><div className="order-route"><MapPin size={15} /><span>{order.address}</span></div><div className="order-details"><span>{order.quantity} × {String(order.livreur.product || "Eau")}</span><strong>{formatPrice(order.total)}</strong></div>{order.status !== "Livrée" && order.status !== "Annulée" && <div className="order-actions"><button className="secondary-small" onClick={() => void updateFirebaseOrderStatus(order.id!, order.status === "Demandée" ? "Acceptée" : order.status === "Acceptée" ? "En route" : "Livrée")}>{order.status === "Demandée" ? "Accepter" : order.status === "Acceptée" ? "Partir en livraison" : "Confirmer la livraison"}</button>{order.status === "Demandée" && <button className="ghost-small" onClick={() => void updateFirebaseOrderStatus(order.id!, "Annulée")}>Refuser</button>}</div>}</article>)}</div>}</section><p className="fine-print">Les commandes et votre disponibilité sont synchronisées avec Firebase.</p></section>;
 }
 
-function ProfileView({ userName, onLogin, onOpenMenu }: { userName?: string | null; onLogin: () => void; onOpenMenu: () => void }) {
-  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div><button className="icon-button" onClick={onOpenMenu} aria-label="Ouvrir le menu"><Menu size={18} /></button></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
+function ProfileView({ userName, onLogin, onOpenMenu, onOpenSettings }: { userName?: string | null; onLogin: () => void; onOpenMenu: () => void; onOpenSettings: (section: SettingsSection) => void }) {
+  return <section className="page-section"><div className="page-heading"><div><span className="eyebrow">Compte</span><h1>Mon espace</h1></div><button className="icon-button" onClick={onOpenMenu} aria-label="Ouvrir le menu"><Menu size={18} /></button></div><article className="profile-card"><div className="profile-avatar">{userName ? userName.slice(0, 1).toUpperCase() : <UserRound size={24} />}</div><div><h2>{userName || "Visiteur"}</h2><p>{userName ? "Compte Eau Rapide actif" : "Connectez-vous pour synchroniser vos commandes"}</p></div>{!userName && <button className="primary-small" onClick={onLogin}>Se connecter</button>}</article><div className="settings-list"><button onClick={() => onOpenSettings("addresses")}><div className="setting-icon"><MapPin size={17} /></div><div><strong>Mes adresses</strong><span>Gérer vos lieux de livraison</span></div><ChevronRight size={17} /></button><button onClick={() => onOpenSettings("favorites")}><div className="setting-icon"><Heart size={17} /></div><div><strong>Mes livreurs favoris</strong><span>Retrouvez vos contacts préférés</span></div><ChevronRight size={17} /></button><button onClick={() => onOpenSettings("privacy")}><div className="setting-icon"><ShieldCheck size={17} /></div><div><strong>Confidentialité</strong><span>Vos données et votre position</span></div><ChevronRight size={17} /></button></div><div className="account-note"><CheckCircle2 size={17} /><span>Version pilote · Paiement à la livraison</span></div></section>;
+}
+
+type SettingsSection = "addresses" | "favorites" | "privacy";
+
+function AccountSettingsModal({ section, settings, livreurs, onClose, onSave }: {
+  section: SettingsSection;
+  settings: CustomerSettings;
+  livreurs: Livreur[];
+  onClose: () => void;
+  onSave: (next: CustomerSettings) => Promise<void>;
+}) {
+  const [address, setAddress] = useState("");
+  const [saving, setSaving] = useState(false);
+  const title = section === "addresses" ? "Mes adresses" : section === "favorites" ? "Mes livreurs favoris" : "Confidentialité";
+  const update = async (next: CustomerSettings) => {
+    setSaving(true);
+    try { await onSave(next); }
+    finally { setSaving(false); }
+  };
+  return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="order-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div className="modal-head"><div><span className="eyebrow">Mon compte</span><h2 id="settings-title">{title}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={19} /></button></div>
+      {section === "addresses" ? <>
+        <p className="modal-note">Enregistrez vos lieux habituels pour les retrouver rapidement lors d’une commande.</p>
+        <label className="field-label" htmlFor="saved-address">Nouvelle adresse</label>
+        <div className="input-with-icon"><MapPin size={17} /><input id="saved-address" value={address} onChange={event => setAddress(event.target.value)} placeholder="Quartier, rue, repère…" /></div>
+        <button className="primary-button full" disabled={saving || !address.trim()} onClick={() => { const nextAddress = address.trim(); void update({ ...settings, addresses: [...settings.addresses.filter(item => item !== nextAddress), nextAddress], defaultAddress: settings.defaultAddress || nextAddress }).then(() => setAddress("")); }}>Ajouter cette adresse</button>
+        <div className="list-stack settings-modal-list">{settings.addresses.map(item => <article className="order-card" key={item}><div className="order-card-top"><strong>{item}</strong>{settings.defaultAddress === item && <span className="status-pill status-delivered">Principale</span>}</div><div className="order-actions">{settings.defaultAddress !== item && <button className="secondary-small" disabled={saving} onClick={() => void update({ ...settings, defaultAddress: item })}>Définir principale</button>}<button className="ghost-small" disabled={saving} onClick={() => void update({ ...settings, addresses: settings.addresses.filter(value => value !== item), defaultAddress: settings.defaultAddress === item ? settings.addresses.find(value => value !== item) || "" : settings.defaultAddress })}>Supprimer</button></div></article>)}{settings.addresses.length === 0 && <div className="empty-state compact"><p>Aucune adresse enregistrée pour le moment.</p></div>}</div>
+      </> : section === "favorites" ? <>
+        <p className="modal-note">Retrouvez ici les livreurs que vous avez ajoutés avec le cœur sur leur fiche.</p>
+        <div className="list-stack settings-modal-list">{settings.favoriteDriverIds.map(id => { const driver = livreurs.find(item => item.id === id); return <article className="order-card" key={id}><div className="order-card-top"><div><strong>{driver?.name || "Livreur indisponible"}</strong><p className="modal-note">{driver?.zone || "Ce profil n’est plus publié."}</p></div><Heart size={18} fill="currentColor" color="var(--lagoon)" /></div><button className="ghost-small" disabled={saving} onClick={() => void update({ ...settings, favoriteDriverIds: settings.favoriteDriverIds.filter(value => value !== id) })}>Retirer des favoris</button></article>})}{settings.favoriteDriverIds.length === 0 && <div className="empty-state compact"><p>Vous n’avez pas encore de livreur favori. Touchez le cœur sur une fiche livreur pour l’ajouter.</p></div>}</div>
+      </> : <>
+        <p className="modal-note">Eau Rapide utilise uniquement les informations nécessaires au fonctionnement du service.</p>
+        <article className="order-card"><strong>Informations du compte</strong><p className="modal-note">Votre identifiant Firebase sert à protéger votre compte et synchroniser vos informations.</p></article>
+        <article className="order-card"><strong>Adresses de livraison</strong><p className="modal-note">Les adresses que vous enregistrez sont conservées dans votre espace et utilisées lorsque vous préparez une commande.</p></article>
+        <article className="order-card"><strong>Position GPS</strong><p className="modal-note">La position n’est demandée que lorsque vous appuyez sur la recherche de proximité. Vous pouvez refuser l’autorisation dans les réglages de votre téléphone.</p></article>
+        <article className="order-card"><strong>Vos choix</strong><p className="modal-note">Vous pouvez modifier ou supprimer vos adresses et vos livreurs favoris depuis cette page. Nous n’affichons pas votre position exacte publiquement.</p></article>
+      </>}
+      <button className="secondary-small full" onClick={onClose}>Fermer</button>
+    </section>
+  </div>;
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
@@ -401,6 +445,8 @@ export default function Home() {
   const [firebaseUser, setFirebaseUser] = useState<{ uid: string; email?: string | null; phoneNumber?: string | null } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
+  const [customerSettings, setCustomerSettings] = useState<CustomerSettings>({ addresses: [], defaultAddress: "", favoriteDriverIds: [] });
   const [orders, setOrders] = useState<Order[]>(() => {
     try { return JSON.parse(localStorage.getItem("eau-rapide-orders") || "[]") as Order[]; } catch { return []; }
   });
@@ -443,6 +489,11 @@ export default function Home() {
   useEffect(() => observeFirebaseUser(nextUser => setFirebaseUser(nextUser ? { uid: nextUser.uid, email: nextUser.email, phoneNumber: nextUser.phoneNumber } : null)), []);
 
   useEffect(() => {
+    if (!firebaseUser) { setCustomerSettings({ addresses: [], defaultAddress: "", favoriteDriverIds: [] }); return; }
+    return observeCustomerSettings(firebaseUser.uid, setCustomerSettings);
+  }, [firebaseUser]);
+
+  useEffect(() => {
     if (!firebaseUser) return;
     return observeCustomerOrders(firebaseUser.uid, remoteOrders => {
       setOrders(remoteOrders.map(order => ({
@@ -460,6 +511,24 @@ export default function Home() {
   const login = () => {
     setAuthOpen(true);
     setMenuOpen(false);
+    setSettingsSection(null);
+  };
+
+  const openSettings = (section: SettingsSection) => {
+    if (!firebaseUser) { toast("Connectez-vous pour enregistrer vos préférences."); login(); return; }
+    setSettingsSection(section);
+  };
+
+  const persistCustomerSettings = async (next: CustomerSettings) => {
+    if (!firebaseUser) return;
+    try { await saveCustomerSettings(firebaseUser.uid, next); setCustomerSettings(next); toast.success("Vos préférences ont été enregistrées."); }
+    catch { toast.error("Impossible d’enregistrer vos préférences. Réessayez."); throw new Error("settings-save-failed"); }
+  };
+
+  const toggleFavorite = (id: string) => {
+    if (!firebaseUser) { toast("Connectez-vous pour conserver vos livreurs favoris."); login(); return; }
+    const favoriteDriverIds = customerSettings.favoriteDriverIds.includes(id) ? customerSettings.favoriteDriverIds.filter(value => value !== id) : [...customerSettings.favoriteDriverIds, id];
+    void persistCustomerSettings({ ...customerSettings, favoriteDriverIds }).catch(() => undefined);
   };
 
   const logout = async () => {
@@ -525,5 +594,5 @@ export default function Home() {
   const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
   const displayName = firebaseUser?.email || firebaseUser?.phoneNumber || user?.name;
-  return <div className="app-shell"><Header userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} onOpenMenu={() => setMenuOpen(true)} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{menuOpen && <div className="account-drawer-backdrop" onClick={() => setMenuOpen(false)}><aside className="account-drawer" role="dialog" aria-modal="true" aria-label="Menu Eau Rapide" onClick={event => event.stopPropagation()}><div className="account-drawer-header"><div className="account-drawer-brand"><BrandMark /><div><strong>Eau Rapide</strong><span>{displayName || "Votre espace"}</span></div></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X size={19} /></button></div><div className="account-drawer-section"><span className="eyebrow">Navigation</span><button onClick={() => navigateFromMenu("accueil")}><Navigation size={18} /><span>Accueil</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("commandes")}><PackageCheck size={18} /><span>Mes commandes</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("profil")}><UserRound size={18} /><span>Mon espace</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("livreur")}><Truck size={18} /><span>Je suis livreur</span><ChevronRight size={17} /></button></div><div className="account-drawer-section muted-section"><span className="eyebrow">Prochainement</span><div className="drawer-coming-soon"><Bell size={18} /><span>Centre de notifications</span><small>Bientôt</small></div><div className="drawer-coming-soon"><MessageCircle size={18} /><span>Centre d’aide</span><small>Bientôt</small></div></div><div className="account-drawer-footer">{firebaseUser ? <button className="drawer-logout" onClick={() => void logout()}><LogOut size={18} /><span>Déconnexion</span></button> : <button className="drawer-login" onClick={login}><UserRound size={18} /><span>Se connecter</span></button>}<p>Version pilote · Eau Rapide</p></div></aside></div>}{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}</div>;
+  return <div className="app-shell"><Header userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} onOpenMenu={() => setMenuOpen(true)} favoriteIds={customerSettings.favoriteDriverIds} onToggleFavorite={toggleFavorite} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} onOpenSettings={openSettings} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{menuOpen && <div className="account-drawer-backdrop" onClick={() => setMenuOpen(false)}><aside className="account-drawer" role="dialog" aria-modal="true" aria-label="Menu Eau Rapide" onClick={event => event.stopPropagation()}><div className="account-drawer-header"><div className="account-drawer-brand"><BrandMark /><div><strong>Eau Rapide</strong><span>{displayName || "Votre espace"}</span></div></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X size={19} /></button></div><div className="account-drawer-section"><span className="eyebrow">Navigation</span><button onClick={() => navigateFromMenu("accueil")}><Navigation size={18} /><span>Accueil</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("commandes")}><PackageCheck size={18} /><span>Mes commandes</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("profil")}><UserRound size={18} /><span>Mon espace</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("livreur")}><Truck size={18} /><span>Je suis livreur</span><ChevronRight size={17} /></button></div><div className="account-drawer-section muted-section"><span className="eyebrow">Prochainement</span><div className="drawer-coming-soon"><Bell size={18} /><span>Centre de notifications</span><small>Bientôt</small></div><div className="drawer-coming-soon"><MessageCircle size={18} /><span>Centre d’aide</span><small>Bientôt</small></div></div><div className="account-drawer-footer">{firebaseUser ? <button className="drawer-logout" onClick={() => void logout()}><LogOut size={18} /><span>Déconnexion</span></button> : <button className="drawer-login" onClick={login}><UserRound size={18} /><span>Se connecter</span></button>}<p>Version pilote · Eau Rapide</p></div></aside></div>}{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}{settingsSection && <AccountSettingsModal section={settingsSection} settings={customerSettings} livreurs={livreurs} onClose={() => setSettingsSection(null)} onSave={persistCustomerSettings} />}</div>;
 }
