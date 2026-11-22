@@ -35,6 +35,7 @@ import {
   observeDriverOrders,
   observeDriverProfile,
   observeCustomerOrders,
+  observeAvailableDrivers,
   observeFirebaseUser,
   registerWithEmail,
   saveDriverProfile,
@@ -151,10 +152,10 @@ function LivreurCard({ livreur, onOrder }: { livreur: Livreur; onOrder: (livreur
           </div>
           <p>{livreur.zone}</p>
         </div>
-        <div className="distance-pill"><Navigation size={13} /> {livreur.distance.toFixed(1)} km</div>
+        <div className="distance-pill"><Navigation size={13} /> {livreur.distance > 0 ? `${livreur.distance.toFixed(1)} km` : livreur.zone}</div>
       </div>
       <div className="livreur-meta-row">
-        <span className="rating"><Star size={14} fill="currentColor" /> {livreur.rating.toFixed(1)} <small>({livreur.deliveries})</small></span>
+        {livreur.rating > 0 && <span className="rating"><Star size={14} fill="currentColor" /> {livreur.rating.toFixed(1)} <small>({livreur.deliveries})</small></span>}
         <span className="eta"><Clock3 size={14} /> {livreur.eta}</span>
         <span>{livreur.product}</span>
       </div>
@@ -405,7 +406,26 @@ export default function Home() {
   });
   const { data: user } = trpc.auth.me.useQuery();
   const livreursQuery = trpc.marketplace.livreurs.useQuery();
-  const livreurs = useMemo(() => livreursQuery.data?.length ? livreursQuery.data : fallbackLivreurs, [livreursQuery.data]);
+  const [availableDrivers, setAvailableDrivers] = useState<FirebaseDriver[]>([]);
+  useEffect(() => observeAvailableDrivers(setAvailableDrivers), []);
+  const livreurs = useMemo(() => {
+    if (availableDrivers.length) {
+      return availableDrivers.map(driver => ({
+        id: driver.id || "",
+        name: driver.name,
+        zone: driver.zone,
+        distance: 0,
+        rating: driver.rating || 0,
+        deliveries: driver.deliveries || 0,
+        product: driver.product,
+        unitPrice: driver.unitPrice,
+        eta: "À confirmer",
+        verified: false,
+        phone: driver.phone,
+      }));
+    }
+    return livreursQuery.data?.length ? livreursQuery.data : fallbackLivreurs;
+  }, [availableDrivers, livreursQuery.data]);
 
   useEffect(() => {
     localStorage.setItem("eau-rapide-orders", JSON.stringify(orders));
