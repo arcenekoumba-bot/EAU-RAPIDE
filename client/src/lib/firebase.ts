@@ -41,6 +41,30 @@ export const loginWithEmail = (email: string, password: string) => signInWithEma
 export const registerWithEmail = (email: string, password: string) => createUserWithEmailAndPassword(firebaseAuth, email, password);
 export const logoutFromFirebase = () => signOut(firebaseAuth);
 
+export type CustomerSettings = {
+  addresses: string[];
+  defaultAddress: string;
+  favoriteDriverIds: string[];
+};
+
+export function observeCustomerSettings(userId: string, callback: (settings: CustomerSettings) => void): Unsubscribe {
+  return onSnapshot(doc(firestore, "users", userId), snapshot => {
+    const data = snapshot.data() || {};
+    callback({
+      addresses: Array.isArray(data.addresses) ? data.addresses.filter((value): value is string => typeof value === "string") : [],
+      defaultAddress: typeof data.defaultAddress === "string" ? data.defaultAddress : "",
+      favoriteDriverIds: Array.isArray(data.favoriteDriverIds) ? data.favoriteDriverIds.filter((value): value is string => typeof value === "string") : [],
+    });
+  }, error => console.warn("Firestore customer settings:", error.message));
+}
+
+export async function saveCustomerSettings(userId: string, settings: CustomerSettings) {
+  await setDoc(doc(firestore, "users", userId), {
+    ...settings,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
 export type FirebaseOrder = {
   id?: string;
   customerId: string;
