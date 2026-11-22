@@ -32,7 +32,9 @@ service cloud.firestore {
         && request.resource.data.phone.size() >= 8
         && request.resource.data.unitPrice is number
         && request.resource.data.unitPrice > 0
-        && request.resource.data.available is bool;
+        && request.resource.data.available is bool
+        && request.resource.data.rating == 0
+        && request.resource.data.deliveries == 0;
       allow update: if isOwner(driverId)
         && request.resource.data.approved == true
         && request.resource.data.rating == resource.data.rating
