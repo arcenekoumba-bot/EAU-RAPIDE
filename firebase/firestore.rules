@@ -16,14 +16,29 @@ service cloud.firestore {
     }
 
     match /drivers/{driverId} {
-      // Le livreur peut lire son propre profil. Les clients ne voient que les
-      // profils validés et disponibles.
+      // Les profils publiés et disponibles sont consultables sans compte
+      // pour permettre aux clients de découvrir les livreurs.
       allow read: if isOwner(driverId)
-        || (signedIn() && resource.data.approved == true && resource.data.available == true);
+        || (resource.data.approved == true && resource.data.available == true);
+      // L'inscription livreur est en libre-service : le propriétaire peut
+      // publier son profil, mais pas modifier les statistiques de confiance.
       allow create: if isOwner(driverId)
-        && request.resource.data.approved == false;
+        && request.resource.data.approved == true
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 1
+        && request.resource.data.zone is string
+        && request.resource.data.zone.size() > 1
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() >= 8
+        && request.resource.data.unitPrice is number
+        && request.resource.data.unitPrice > 0
+        && request.resource.data.available is bool
+        && request.resource.data.rating == 0
+        && request.resource.data.deliveries == 0;
       allow update: if isOwner(driverId)
-        && request.resource.data.approved == resource.data.approved;
+        && request.resource.data.approved == true
+        && request.resource.data.rating == resource.data.rating
+        && request.resource.data.deliveries == resource.data.deliveries;
       allow delete: if false;
     }
 
