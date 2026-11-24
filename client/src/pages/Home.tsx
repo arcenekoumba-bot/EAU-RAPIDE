@@ -325,7 +325,9 @@ function AccountSettingsModal({ section, settings, livreurs, onClose, onSave }: 
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
-  const [method, setMethod] = useState<"phone" | "email">("email");
+  const [method, setMethod] = useState<"phone" | "email" | "phonePin">("email");
+  const [pinPhone, setPinPhone] = useState("");
+  const [pin, setPin] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
@@ -385,6 +387,31 @@ function AuthModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const normalizeGabonPhone = (value: string) => {
+    const digits = value.replace(/\\D/g, "").replace(/^241/, "");
+    return digits.length === 8 ? `+241${digits}` : "";
+  };
+
+  const submitPhonePin = async () => {
+    const normalized = normalizeGabonPhone(pinPhone);
+    if (!normalized) { toast.error("Entrez un numéro gabonais valide à 8 chiffres."); return; }
+    if (!/^\\d{6,}$/.test(pin)) { toast.error("Le code PIN doit contenir au moins 6 chiffres."); return; }
+    setBusy(true);
+    try {
+      const phoneEmail = `${normalized.replace(/\\+/g, "")}@phone.eaurapide.app`;
+      if (register) await registerWithEmail(phoneEmail, pin);
+      else await loginWithEmail(phoneEmail, pin);
+      toast.success(register ? "Compte créé !" : "Connexion réussie !");
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("auth/email-already-in-use")) toast.error("Ce numéro possède déjà un compte. Connectez-vous.");
+      else if (message.includes("auth/invalid-credential") || message.includes("auth/user-not-found")) toast.error("Numéro ou PIN incorrect.");
+      else if (message.includes("auth/weak-password")) toast.error("Choisissez un PIN plus long.");
+      else toast.error("Impossible de créer le compte ou de se connecter.");
+    } finally { setBusy(false); }
+  };
+
   const submitEmail = async () => {
     if (!email || password.length < 6) {
       toast.error("Renseignez un e-mail et un mot de passe d’au moins 6 caractères.");
@@ -407,7 +434,16 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="order-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <div className="modal-head"><div><span className="eyebrow">Eau Rapide</span><h2 id="auth-title">{method === "phone" ? (confirmation ? "Vérifier mon numéro" : "Connexion par SMS") : (register ? "Créer mon compte" : "Connexion par e-mail")}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={19} /></button></div>
-      {method === "phone" ? <>
+      {method === "phonePin" ? <>
+        <p className="modal-note">Créez un compte avec votre numéro gabonais et un PIN personnel. Aucun SMS n’est envoyé. Le numéro n’est pas vérifié par cette méthode.</p>
+        <label className="field-label" htmlFor="pin-phone">Numéro de téléphone</label>
+        <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="pin-phone" className="text-input" type="tel" inputMode="numeric" value={pinPhone} onChange={event => setPinPhone(event.target.value.replace(/[^0-9\\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" autoComplete="tel-national" /></div>
+        <label className="field-label" htmlFor="driver-pin">{register ? "Créer mon PIN (6 chiffres minimum)" : "Mon code PIN"}</label>
+        <input id="driver-pin" className="text-input" type="password" inputMode="numeric" autoComplete={register ? "new-password" : "current-password"} value={pin} onChange={event => setPin(event.target.value.replace(/\\D/g, "").slice(0, 12))} placeholder="••••••" />
+        <button className="primary-button full" onClick={() => void submitPhonePin()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte livreur" : "Se connecter"}</button>
+        <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un nouveau compte"}</button>
+        <button className="text-button auth-switch" onClick={() => setMethod("email")}>Connexion par e-mail</button>
+      </> : method === "phone" ? <>
         <p className="modal-note">{confirmation ? `Un code de vérification a été envoyé au +241 ${phone}.` : "Entrez votre numéro de téléphone. Nous vous enverrons un code à 6 chiffres par SMS."}</p>
         {!confirmation ? <>
           <label className="field-label" htmlFor="auth-phone">Numéro de téléphone</label>
@@ -431,7 +467,8 @@ function AuthModal({ onClose }: { onClose: () => void }) {
         <input id="auth-password" className="text-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="6 caractères minimum" autoComplete={register ? "new-password" : "current-password"} />
         <button className="primary-button full" onClick={() => void submitEmail()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte" : "Se connecter"}</button>
         <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un compte gratuitement"}</button>
-        <button className="text-button auth-switch" onClick={() => toast("La connexion par numéro + PIN sans SMS arrive dans une prochaine mise à jour. Aucun SMS ne sera envoyé.")}>Inscription par numéro + code PIN (bientôt)</button>
+        <button className="text-button auth-switch" onClick={() => { setMethod("phonePin"); setRegister(true); }}>Créer mon compte livreur avec numéro + PIN</button>
+        <button className="text-button auth-switch" onClick={() => { setMethod("phonePin"); setRegister(false); }}>Connexion livreur par numéro + PIN</button>
       </>}
     </section>
   </div>;
