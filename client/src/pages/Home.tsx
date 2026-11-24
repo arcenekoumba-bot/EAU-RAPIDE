@@ -405,6 +405,10 @@ function AuthModal({ onClose }: { onClose: () => void }) {
     const normalized = normalizeGabonPhone(pinPhone);
     if (!normalized) { toast.error("Entrez un numéro gabonais valide à 8 chiffres."); return; }
     if (!/^\d{6,}$/.test(pin)) { toast.error("Le code PIN doit contenir au moins 6 chiffres."); return; }
+    if (register && (!driverName.trim() || !driverZone.trim() || !driverProduct.trim() || !Number.isFinite(Number(driverPrice)) || Number(driverPrice) < 1)) {
+      toast.error("Complétez votre nom, votre zone, votre produit et votre tarif.");
+      return;
+    }
     setBusy(true);
     try {
       const phoneEmail = `${normalized.replace(/\+/g, "")}@phone.eaurapide.app`;
