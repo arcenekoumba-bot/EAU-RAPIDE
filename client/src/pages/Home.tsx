@@ -239,6 +239,11 @@ function DriverView({ onLogin, userId }: { onLogin: () => void; userId?: string 
     const stopProfile = observeDriverProfile(userId, nextProfile => {
       setProfile(nextProfile);
       if (nextProfile) setForm({ name: nextProfile.name, zone: nextProfile.zone, phone: nextProfile.phone, product: nextProfile.product, unitPrice: String(nextProfile.unitPrice) });
+      else {
+        const accountEmail = firebaseAuth.currentUser?.email || "";
+        const phoneMatch = accountEmail.match(/^(241\\d{8})@phone\\.eaurapide\\.app$/);
+        if (phoneMatch) setForm(current => ({ ...current, phone: `+${phoneMatch[1]}` }));
+      }
     });
     const stopOrders = observeDriverOrders(userId, setOrders);
     return () => { stopProfile(); stopOrders(); };
