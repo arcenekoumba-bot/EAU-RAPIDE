@@ -327,3 +327,27 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 @media (min-width: 760px) and (max-width: 1083px) {
   .app-shell { padding-bottom: 90px; }
 }
+
+/* Clearer phone + PIN onboarding */
+.phone-pin-intro {
+  display: grid;
+  gap: 7px;
+  padding: 14px 15px;
+  margin: 0 0 15px;
+  color: #124b46;
+  background: #e5f1ed;
+  border: 1px solid #c8e1d9;
+  border-radius: 13px;
+}
+.phone-pin-intro strong { font-size: 15px; line-height: 1.25; }
+.phone-pin-intro span { color: #365f59; font-size: 13px; line-height: 1.55; }
+.signup-section-title {
+  margin-top: 19px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+  color: var(--lagoon);
+  font-size: 14px;
+  font-weight: 850;
+}
+.phone-pin-intro + .field-label,
+.signup-section-title + .field-label { margin-top: 11px; }
