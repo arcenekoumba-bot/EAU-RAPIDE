@@ -239,6 +239,11 @@ function DriverView({ onLogin, userId }: { onLogin: () => void; userId?: string 
     const stopProfile = observeDriverProfile(userId, nextProfile => {
       setProfile(nextProfile);
       if (nextProfile) setForm({ name: nextProfile.name, zone: nextProfile.zone, phone: nextProfile.phone, product: nextProfile.product, unitPrice: String(nextProfile.unitPrice) });
+      else {
+        const accountEmail = firebaseAuth.currentUser?.email || "";
+        const phoneMatch = accountEmail.match(/^(241\\d{8})@phone\\.eaurapide\\.app$/);
+        if (phoneMatch) setForm(current => ({ ...current, phone: `+${phoneMatch[1]}` }));
+      }
     });
     const stopOrders = observeDriverOrders(userId, setOrders);
     return () => { stopProfile(); stopOrders(); };
@@ -325,7 +330,13 @@ function AccountSettingsModal({ section, settings, livreurs, onClose, onSave }: 
 }
 
 function AuthModal({ onClose }: { onClose: () => void }) {
-  const [method, setMethod] = useState<"phone" | "email">("email");
+  const [method, setMethod] = useState<"phone" | "email" | "phonePin">("email");
+  const [pinPhone, setPinPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [driverZone, setDriverZone] = useState("");
+  const [driverProduct, setDriverProduct] = useState("Bidon 20 L");
+  const [driverPrice, setDriverPrice] = useState("2500");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
@@ -385,6 +396,39 @@ function AuthModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const normalizeGabonPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "").replace(/^241/, "");
+    return digits.length === 8 ? `+241${digits}` : "";
+  };
+
+  const submitPhonePin = async () => {
+    const normalized = normalizeGabonPhone(pinPhone);
+    if (!normalized) { toast.error("Entrez un numéro gabonais valide à 8 chiffres."); return; }
+    if (!/^\d{6,}$/.test(pin)) { toast.error("Le code PIN doit contenir au moins 6 chiffres."); return; }
+    if (register && (!driverName.trim() || !driverZone.trim() || !driverProduct.trim() || !Number.isFinite(Number(driverPrice)) || Number(driverPrice) < 1)) {
+      toast.error("Complétez votre nom, votre zone, votre produit et votre tarif.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const phoneEmail = `${normalized.replace(/\+/g, "")}@phone.eaurapide.app`;
+      if (register) {
+        await registerWithEmail(phoneEmail, pin);
+        const uid = firebaseAuth.currentUser?.uid;
+        if (!uid) throw new Error("auth/user-not-found");
+        await saveDriverProfile(uid, { name: driverName.trim(), zone: driverZone.trim(), phone: normalized, product: driverProduct.trim(), unitPrice: Number(driverPrice), available: true });
+      } else await loginWithEmail(phoneEmail, pin);
+      toast.success(register ? "Compte et profil livreur créés !" : "Connexion réussie !");
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("auth/email-already-in-use")) toast.error("Ce numéro possède déjà un compte. Connectez-vous.");
+      else if (message.includes("auth/invalid-credential") || message.includes("auth/user-not-found")) toast.error("Numéro ou PIN incorrect.");
+      else if (message.includes("auth/weak-password")) toast.error("Choisissez un PIN plus long.");
+      else toast.error("Impossible de créer le compte ou de se connecter.");
+    } finally { setBusy(false); }
+  };
+
   const submitEmail = async () => {
     if (!email || password.length < 6) {
       toast.error("Renseignez un e-mail et un mot de passe d’au moins 6 caractères.");
@@ -407,7 +451,27 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="order-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
       <div className="modal-head"><div><span className="eyebrow">Eau Rapide</span><h2 id="auth-title">{method === "phone" ? (confirmation ? "Vérifier mon numéro" : "Connexion par SMS") : (register ? "Créer mon compte" : "Connexion par e-mail")}</h2></div><button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={19} /></button></div>
-      {method === "phone" ? <>
+      {method === "phonePin" ? <>
+        <div className="phone-pin-intro"><strong>Inscription simple et sans SMS</strong><span>Votre numéro et votre code PIN vous permettront de vous connecter. Choisissez un PIN personnel d’au moins 6 chiffres.</span></div>
+        <label className="field-label" htmlFor="pin-phone">Numéro de téléphone</label>
+        <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="pin-phone" className="text-input" type="tel" inputMode="numeric" value={pinPhone} onChange={event => setPinPhone(event.target.value.replace(/[^0-9\\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" autoComplete="tel-national" /></div>
+        {register && <>
+          <div className="signup-section-title">Votre profil livreur</div>
+          <label className="field-label" htmlFor="signup-driver-name">Nom et prénom</label>
+          <input id="signup-driver-name" className="text-input" value={driverName} onChange={event => setDriverName(event.target.value)} placeholder="Ex. Grâce Moussavou" autoComplete="name" />
+          <label className="field-label" htmlFor="signup-driver-zone">Zone de livraison</label>
+          <input id="signup-driver-zone" className="text-input" value={driverZone} onChange={event => setDriverZone(event.target.value)} placeholder="Ex. Akanda · La Sablière" />
+          <label className="field-label" htmlFor="signup-driver-product">Produit proposé</label>
+          <input id="signup-driver-product" className="text-input" value={driverProduct} onChange={event => setDriverProduct(event.target.value)} placeholder="Ex. Bidon 20 L" />
+          <label className="field-label" htmlFor="signup-driver-price">Prix par contenant (FCFA)</label>
+          <input id="signup-driver-price" className="text-input" type="number" min="1" inputMode="numeric" value={driverPrice} onChange={event => setDriverPrice(event.target.value)} />
+        </>}
+        <label className="field-label" htmlFor="driver-pin">{register ? "Créer mon code PIN (6 chiffres minimum)" : "Mon code PIN"}</label>
+        <input id="driver-pin" className="text-input" type="password" inputMode="numeric" autoComplete={register ? "new-password" : "current-password"} value={pin} onChange={event => setPin(event.target.value.replace(/\\D/g, "").slice(0, 12))} placeholder="••••••" />
+        <button className="primary-button full" onClick={() => void submitPhonePin()} disabled={busy}>{busy ? "Création en cours…" : register ? "Créer mon compte complet" : "Se connecter"}</button>
+        <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un nouveau compte"}</button>
+        <button className="text-button auth-switch" onClick={() => setMethod("email")}>Connexion par e-mail</button>
+      </> : method === "phone" ? <>
         <p className="modal-note">{confirmation ? `Un code de vérification a été envoyé au +241 ${phone}.` : "Entrez votre numéro de téléphone. Nous vous enverrons un code à 6 chiffres par SMS."}</p>
         {!confirmation ? <>
           <label className="field-label" htmlFor="auth-phone">Numéro de téléphone</label>
@@ -431,7 +495,8 @@ function AuthModal({ onClose }: { onClose: () => void }) {
         <input id="auth-password" className="text-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="6 caractères minimum" autoComplete={register ? "new-password" : "current-password"} />
         <button className="primary-button full" onClick={() => void submitEmail()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte" : "Se connecter"}</button>
         <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un compte gratuitement"}</button>
-        <button className="text-button auth-switch" onClick={() => toast("La connexion par numéro + PIN sans SMS arrive dans une prochaine mise à jour. Aucun SMS ne sera envoyé.")}>Inscription par numéro + code PIN (bientôt)</button>
+        <button className="text-button auth-switch" onClick={() => { setMethod("phonePin"); setRegister(true); }}>Créer mon compte livreur avec numéro + PIN</button>
+        <button className="text-button auth-switch" onClick={() => { setMethod("phonePin"); setRegister(false); }}>Connexion livreur par numéro + PIN</button>
       </>}
     </section>
   </div>;
@@ -453,7 +518,12 @@ export default function Home() {
   const { data: user } = trpc.auth.me.useQuery();
   const livreursQuery = trpc.marketplace.livreurs.useQuery();
   const [availableDrivers, setAvailableDrivers] = useState<FirebaseDriver[]>([]);
+  const [signedInDriverProfile, setSignedInDriverProfile] = useState<FirebaseDriver | null>(null);
   useEffect(() => observeAvailableDrivers(setAvailableDrivers), []);
+  useEffect(() => {
+    if (!firebaseUser) { setSignedInDriverProfile(null); return; }
+    return observeDriverProfile(firebaseUser.uid, setSignedInDriverProfile);
+  }, [firebaseUser]);
   const livreurs = useMemo(() => {
     if (availableDrivers.length) {
       return availableDrivers.map(driver => ({
@@ -593,6 +663,7 @@ export default function Home() {
   };
   const cancelOrder = (id: string) => { if (firebaseUser && !id.startsWith("ER-")) void updateFirebaseOrderStatus(id, "Annulée"); setOrders(current => current.map(order => order.id === id ? { ...order, status: "Annulée" } : order)); toast("Commande annulée"); };
 
-  const displayName = firebaseUser?.email || firebaseUser?.phoneNumber || user?.name;
+  const emailDisplay = firebaseUser?.email && !firebaseUser.email.endsWith("@phone.eaurapide.app") ? firebaseUser.email : null;
+  const displayName = signedInDriverProfile?.name || user?.name || emailDisplay || firebaseUser?.phoneNumber || (firebaseUser ? "Compte Eau Rapide" : null);
   return <div className="app-shell"><Header userName={displayName} onLogin={login} onOpenMenu={() => setMenuOpen(true)} /><main className="app-main"><div className="mode-switch" role="tablist" aria-label="Type d’espace"><button className={mode === "client" ? "mode-button active" : "mode-button"} onClick={() => { setMode("client"); setActiveTab("accueil"); }}><ShoppingBag size={15} /> Je cherche de l’eau</button><button className={mode === "livreur" ? "mode-button active" : "mode-button"} onClick={() => { setMode("livreur"); setActiveTab("profil"); }}><Truck size={15} /> Je suis livreur</button></div>{mode === "livreur" ? <DriverView onLogin={login} userId={firebaseUser?.uid} /> : activeTab === "accueil" ? <ClientHome livreurs={livreurs} onOrder={setSelectedLivreur} onLocate={locate} locationLabel={locationLabel} favoriteIds={customerSettings.favoriteDriverIds} onToggleFavorite={toggleFavorite} /> : activeTab === "commandes" ? <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} /> : <ProfileView userName={displayName} onLogin={login} onOpenSettings={openSettings} />}</main><BottomNav activeTab={activeTab} onChange={setActiveTab} />{menuOpen && <div className="account-drawer-backdrop" onClick={() => setMenuOpen(false)}><aside className="account-drawer" role="dialog" aria-modal="true" aria-label="Menu Eau Rapide" onClick={event => event.stopPropagation()}><div className="account-drawer-header"><div className="account-drawer-brand"><BrandMark /><div><strong>Eau Rapide</strong><span>{displayName || "Votre espace"}</span></div></div><button className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X size={19} /></button></div><div className="account-drawer-section"><span className="eyebrow">Navigation</span><button onClick={() => navigateFromMenu("accueil")}><Navigation size={18} /><span>Accueil</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("commandes")}><PackageCheck size={18} /><span>Mes commandes</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("profil")}><UserRound size={18} /><span>Mon espace</span><ChevronRight size={17} /></button><button onClick={() => navigateFromMenu("livreur")}><Truck size={18} /><span>Je suis livreur</span><ChevronRight size={17} /></button></div><div className="account-drawer-section muted-section"><span className="eyebrow">Prochainement</span><div className="drawer-coming-soon"><Bell size={18} /><span>Centre de notifications</span><small>Bientôt</small></div><div className="drawer-coming-soon"><MessageCircle size={18} /><span>Centre d’aide</span><small>Bientôt</small></div></div><div className="account-drawer-footer">{firebaseUser ? <button className="drawer-logout" onClick={() => void logout()}><LogOut size={18} /><span>Déconnexion</span></button> : <button className="drawer-login" onClick={login}><UserRound size={18} /><span>Se connecter</span></button>}<p>Version pilote · Eau Rapide</p></div></aside></div>}{selectedLivreur && <OrderModal livreur={selectedLivreur} onClose={() => setSelectedLivreur(null)} onConfirm={(quantity, address) => void confirmOrder(selectedLivreur, quantity, address)} defaultAddress={customerSettings.defaultAddress} />}{authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}{settingsSection && <AccountSettingsModal section={settingsSection} settings={customerSettings} livreurs={livreurs} onClose={() => setSettingsSection(null)} onSave={persistCustomerSettings} />}</div>;
 }
