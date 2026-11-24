@@ -388,17 +388,17 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   };
 
   const normalizeGabonPhone = (value: string) => {
-    const digits = value.replace(/\\D/g, "").replace(/^241/, "");
+    const digits = value.replace(/\D/g, "").replace(/^241/, "");
     return digits.length === 8 ? `+241${digits}` : "";
   };
 
   const submitPhonePin = async () => {
     const normalized = normalizeGabonPhone(pinPhone);
     if (!normalized) { toast.error("Entrez un numéro gabonais valide à 8 chiffres."); return; }
-    if (!/^\\d{6,}$/.test(pin)) { toast.error("Le code PIN doit contenir au moins 6 chiffres."); return; }
+    if (!/^\d{6,}$/.test(pin)) { toast.error("Le code PIN doit contenir au moins 6 chiffres."); return; }
     setBusy(true);
     try {
-      const phoneEmail = `${normalized.replace(/\\+/g, "")}@phone.eaurapide.app`;
+      const phoneEmail = `${normalized.replace(/\+/g, "")}@phone.eaurapide.app`;
       if (register) await registerWithEmail(phoneEmail, pin);
       else await loginWithEmail(phoneEmail, pin);
       toast.success(register ? "Compte créé !" : "Connexion réussie !");
@@ -437,9 +437,9 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       {method === "phonePin" ? <>
         <p className="modal-note">Créez un compte avec votre numéro gabonais et un PIN personnel. Aucun SMS n’est envoyé. Le numéro n’est pas vérifié par cette méthode.</p>
         <label className="field-label" htmlFor="pin-phone">Numéro de téléphone</label>
-        <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="pin-phone" className="text-input" type="tel" inputMode="numeric" value={pinPhone} onChange={event => setPinPhone(event.target.value.replace(/[^0-9\\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" autoComplete="tel-national" /></div>
+        <div className="phone-auth-input"><span>🇬🇦 +241</span><input id="pin-phone" className="text-input" type="tel" inputMode="numeric" value={pinPhone} onChange={event => setPinPhone(event.target.value.replace(/[^0-9\s]/g, "").slice(0, 12))} placeholder="06 12 34 56" autoComplete="tel-national" /></div>
         <label className="field-label" htmlFor="driver-pin">{register ? "Créer mon PIN (6 chiffres minimum)" : "Mon code PIN"}</label>
-        <input id="driver-pin" className="text-input" type="password" inputMode="numeric" autoComplete={register ? "new-password" : "current-password"} value={pin} onChange={event => setPin(event.target.value.replace(/\\D/g, "").slice(0, 12))} placeholder="••••••" />
+        <input id="driver-pin" className="text-input" type="password" inputMode="numeric" autoComplete={register ? "new-password" : "current-password"} value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, "").slice(0, 12))} placeholder="••••••" />
         <button className="primary-button full" onClick={() => void submitPhonePin()} disabled={busy}>{busy ? "Patientez…" : register ? "Créer mon compte livreur" : "Se connecter"}</button>
         <button className="text-button auth-switch" onClick={() => setRegister(value => !value)}>{register ? "J’ai déjà un compte" : "Créer un nouveau compte"}</button>
         <button className="text-button auth-switch" onClick={() => setMethod("email")}>Connexion par e-mail</button>
